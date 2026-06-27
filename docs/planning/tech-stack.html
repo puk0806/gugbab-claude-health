@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>기술 스택 — gugbab-health</title>
+  <style>
+    :root {
+      --green: #22c55e;
+      --blue: #60a5fa;
+      --purple: #a78bfa;
+      --yellow: #fbbf24;
+      --bg: #0f172a;
+      --bg2: #1e293b;
+      --bg3: #334155;
+      --text: #f1f5f9;
+      --text2: #94a3b8;
+      --border: #334155;
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 0 0 80px;
+    }
+    .topbar {
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .topbar a { color: var(--text2); text-decoration: none; font-size: 0.875rem; }
+    .topbar a:hover { color: var(--green); }
+    .topbar .sep { color: var(--border); }
+    .topbar .current { color: var(--text); font-weight: 600; }
+    .container { max-width: 860px; margin: 0 auto; padding: 48px 32px; }
+    .page-header { margin-bottom: 48px; }
+    .page-header .emoji { font-size: 3rem; margin-bottom: 16px; }
+    .page-header h1 { font-size: 2rem; font-weight: 700; margin-bottom: 8px; }
+    .page-header p { color: var(--text2); }
+    .updated { color: var(--text2); font-size: 0.8rem; margin-top: 8px; }
+
+    section { margin-bottom: 48px; }
+    h2 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .h2-icon { font-size: 1.2rem; }
+
+    .stack-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+    }
+    .stack-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+    }
+    .stack-card .label { color: var(--text2); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+    .stack-card .value { font-size: 0.95rem; font-weight: 700; margin-bottom: 4px; }
+    .stack-card .note { color: var(--text2); font-size: 0.8rem; }
+    .green { color: var(--green); }
+    .blue { color: var(--blue); }
+    .purple { color: var(--purple); }
+    .yellow { color: var(--yellow); }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    th { text-align: left; color: var(--text2); font-weight: 600; padding: 10px 14px; background: var(--bg3); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    th:first-child { border-radius: 8px 0 0 8px; }
+    th:last-child { border-radius: 0 8px 8px 0; }
+    td { padding: 12px 14px; border-bottom: 1px solid var(--border); color: var(--text2); vertical-align: top; }
+    td:first-child { color: var(--text); font-weight: 500; }
+    tr:last-child td { border-bottom: none; }
+    code {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      background: var(--bg3);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      color: var(--green);
+    }
+
+    .db-schema {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.8rem;
+      line-height: 1.8;
+      overflow-x: auto;
+    }
+    .db-schema .kw { color: var(--purple); }
+    .db-schema .type { color: var(--blue); }
+    .db-schema .str { color: var(--yellow); }
+    .db-schema .cm { color: #475569; }
+
+    .ai-flow {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+    }
+    .ai-flow h3 { font-size: 0.875rem; font-weight: 700; color: var(--green); margin-bottom: 12px; }
+    .ai-flow ul { color: var(--text2); font-size: 0.875rem; line-height: 1.8; padding-left: 18px; }
+    .ai-flow + .ai-flow { margin-top: 12px; }
+
+    .arch-box {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.78rem;
+      line-height: 1.9;
+      overflow-x: auto;
+    }
+    .arch-box .g { color: var(--green); }
+    .arch-box .b { color: var(--blue); }
+    .arch-box .p { color: var(--purple); }
+    .arch-box .dim { color: #475569; }
+    .arch-box .w { color: var(--text); }
+
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <a href="../index.html">🥗 gugbab-health</a>
+    <span class="sep">/</span>
+    <span class="current">기술 스택</span>
+  </div>
+
+  <div class="container">
+    <div class="page-header">
+      <div class="emoji">⚙️</div>
+      <h1>기술 스택</h1>
+      <p>프레임워크 · AI · DB · 테스트 · 배포 상세 스펙</p>
+      <p class="updated">최종 업데이트: 2026-06-27 · 레퍼런스: 03_gugbab-claude-dream</p>
+    </div>
+
+    <!-- 핵심 스택 -->
+    <section>
+      <h2><span class="h2-icon">🏗️</span> 핵심 스택</h2>
+      <div class="stack-grid">
+        <div class="stack-card">
+          <div class="label">프레임워크</div>
+          <div class="value green">Next.js 16</div>
+          <div class="note">App Router</div>
+        </div>
+        <div class="stack-card">
+          <div class="label">언어</div>
+          <div class="value blue">TypeScript 5</div>
+          <div class="note">strict 모드</div>
+        </div>
+        <div class="stack-card">
+          <div class="label">런타임</div>
+          <div class="value">Node.js</div>
+          <div class="note">≥ 22.13</div>
+        </div>
+        <div class="stack-card">
+          <div class="label">패키지 매니저</div>
+          <div class="value purple">pnpm 9.15</div>
+          <div class="note">워크스페이스</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- UI -->
+    <section>
+      <h2><span class="h2-icon">🎨</span> UI</h2>
+      <table>
+        <thead><tr><th>항목</th><th>기술</th><th>비고</th></tr></thead>
+        <tbody>
+          <tr><td>UI 컴포넌트</td><td><code>@gugbab/styled-radix</code></td><td>Radix 기반 디자인 시스템</td></tr>
+          <tr><td>디자인 토큰</td><td><code>@gugbab/tokens</code></td><td>색상·타이포·간격</td></tr>
+          <tr><td>공통 훅</td><td><code>@gugbab/hooks</code></td><td></td></tr>
+          <tr><td>공통 유틸</td><td><code>@gugbab/utils</code></td><td></td></tr>
+          <tr><td>스타일링</td><td>CSS Modules</td><td>인라인 스타일 금지</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- PWA -->
+    <section>
+      <h2><span class="h2-icon">📱</span> PWA</h2>
+      <table>
+        <thead><tr><th>항목</th><th>기술</th><th>비고</th></tr></thead>
+        <tbody>
+          <tr><td>PWA</td><td><code>@serwist/next</code></td><td>dream 앱 동일 패턴</td></tr>
+          <tr><td>Service Worker</td><td>Serwist</td><td>오프라인 캐시 전략</td></tr>
+          <tr><td>Lighthouse 목표</td><td>PWA 점수 90+</td><td></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 데이터 -->
+    <section>
+      <h2><span class="h2-icon">💾</span> 데이터 (IndexedDB)</h2>
+      <p style="color:var(--text2);font-size:0.875rem;margin-bottom:16px">라이브러리: <code>idb</code> — dream 앱 동일 패턴. 모든 데이터 로컬 전용, 서버 없음.</p>
+      <div class="db-schema">
+<span class="cm">// DB: gugbab-health</span>
+
+<span class="kw">store</span> <span class="w">ingredients</span> {
+  id<span class="dim">:</span>        <span class="type">string</span>              <span class="cm">// ulid</span>
+  name<span class="dim">:</span>      <span class="type">string</span>              <span class="cm">// "닭가슴살"</span>
+  category<span class="dim">:</span>  <span class="type">IngredientCategory</span>
+  addedAt<span class="dim">:</span>   <span class="type">string</span>              <span class="cm">// ISO date</span>
+}
+
+<span class="kw">store</span> <span class="w">bodyMetrics</span> {
+  id<span class="dim">:</span>                   <span class="type">string</span>
+  date<span class="dim">:</span>                 <span class="type">string</span>
+  weight<span class="dim">:</span>               <span class="type">number</span>          <span class="cm">// kg</span>
+  bodyFatPct<span class="dim">?:</span>          <span class="type">number</span>          <span class="cm">// %</span>
+  skeletalMuscleMass<span class="dim">?:</span>  <span class="type">number</span>          <span class="cm">// kg</span>
+}
+
+<span class="kw">store</span> <span class="w">mealHistory</span> {
+  id<span class="dim">:</span>        <span class="type">string</span>
+  date<span class="dim">:</span>      <span class="type">string</span>
+  messages<span class="dim">:</span>  <span class="type">ChatMessage[]</span>
+  summary<span class="dim">?:</span>  <span class="type">string</span>          <span class="cm">// AI 생성 식단 요약</span>
+}
+
+<span class="kw">store</span> <span class="w">userProfile</span> {
+  id<span class="dim">:</span>         <span class="type">string</span>
+  gender<span class="dim">:</span>     <span class="str">'male'</span> | <span class="str">'female'</span>
+  goals<span class="dim">:</span>      <span class="type">Goal[]</span>
+  createdAt<span class="dim">:</span>  <span class="type">string</span>
+}
+      </div>
+    </section>
+
+    <!-- AI 연동 -->
+    <section>
+      <h2><span class="h2-icon">🤖</span> AI 연동</h2>
+      <table style="margin-bottom:20px">
+        <thead><tr><th>항목</th><th>기술</th><th>비고</th></tr></thead>
+        <tbody>
+          <tr><td>AI 제공자</td><td>OpenAI</td><td>추후 Claude 전환 가능</td></tr>
+          <tr><td>SDK</td><td><code>openai</code></td><td></td></tr>
+          <tr><td>호출 위치</td><td><code>/api/chat</code> Route</td><td>클라이언트에 API 키 노출 금지</td></tr>
+          <tr><td>스트리밍</td><td>OpenAI Streaming</td><td>타이핑 인디케이터 효과</td></tr>
+          <tr><td>스킬·에이전트 연동</td><td>A 또는 B — 구현 시 결정</td><td></td></tr>
+        </tbody>
+      </table>
+
+      <div class="ai-flow">
+        <h3>매 요청 시 AI context 구성</h3>
+        <ul>
+          <li>사용자 프로필 (성별, 목표)</li>
+          <li>최근 신체 지표 3개 + 변화율 계산</li>
+          <li>현재 식재료 목록 전체</li>
+          <li>최근 7일 식단 이력 (중복 방지)</li>
+          <li>스킬 내용 또는 function definitions (방식 A/B에 따라)</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 아키텍처 -->
+    <section>
+      <h2><span class="h2-icon">🗂️</span> 디렉토리 구조</h2>
+      <div class="arch-box">
+<span class="w">gugbab-health/</span>
+<span class="dim">├─</span> <span class="g">app/</span>
+<span class="dim">│  ├─</span> <span class="w">page.tsx</span>               <span class="dim">→ 식단 채팅 (메인)</span>
+<span class="dim">│  ├─</span> <span class="w">ingredients/page.tsx</span>   <span class="dim">→ 식재료</span>
+<span class="dim">│  ├─</span> <span class="w">body/page.tsx</span>          <span class="dim">→ 신체 지표</span>
+<span class="dim">│  ├─</span> <span class="w">settings/page.tsx</span>      <span class="dim">→ 설정</span>
+<span class="dim">│  ├─</span> <span class="w">onboarding/page.tsx</span>    <span class="dim">→ 온보딩</span>
+<span class="dim">│  └─</span> <span class="b">api/chat/route.ts</span>      <span class="dim">→ OpenAI 서버사이드 호출</span>
+<span class="dim">├─</span> <span class="g">components/</span>
+<span class="dim">│  ├─</span> <span class="w">layout/</span>               <span class="dim">→ 하단 네비, 레이아웃</span>
+<span class="dim">│  ├─</span> <span class="w">chat/</span>                 <span class="dim">→ 채팅 UI</span>
+<span class="dim">│  ├─</span> <span class="w">ingredients/</span>          <span class="dim">→ 식재료 컴포넌트</span>
+<span class="dim">│  ├─</span> <span class="w">body/</span>                 <span class="dim">→ 신체지표·그래프</span>
+<span class="dim">│  └─</span> <span class="w">onboarding/</span>           <span class="dim">→ 온보딩 스텝</span>
+<span class="dim">├─</span> <span class="p">lib/</span>
+<span class="dim">│  ├─</span> <span class="w">db/</span>                   <span class="dim">→ IndexedDB stores (idb)</span>
+<span class="dim">│  ├─</span> <span class="w">ai/</span>                   <span class="dim">→ context 조합, 스킬 연동</span>
+<span class="dim">│  └─</span> <span class="w">skills/</span>               <span class="dim">→ .claude/skills 파싱</span>
+<span class="dim">├─</span> <span class="w">public/</span>                   <span class="dim">→ PWA 아이콘, manifest</span>
+<span class="dim">├─</span> <span class="w">e2e/</span>                      <span class="dim">→ Playwright 시각 회귀 테스트</span>
+<span class="dim">├─</span> <span class="w">next.config.ts</span>
+<span class="dim">├─</span> <span class="w">biome.json</span>
+<span class="dim">└─</span> <span class="w">playwright.config.ts</span>
+      </div>
+    </section>
+
+    <!-- 품질·배포 -->
+    <section>
+      <h2><span class="h2-icon">🚀</span> 품질 & 배포</h2>
+      <table>
+        <thead><tr><th>항목</th><th>기술</th><th>비고</th></tr></thead>
+        <tbody>
+          <tr><td>린트·포맷</td><td><code>Biome</code></td><td><code>@gugbab/biome-config</code> 적용</td></tr>
+          <tr><td>타입 체크</td><td><code>tsc --noEmit</code></td><td>CI에서 검증</td></tr>
+          <tr><td>시각 회귀</td><td><code>Playwright</code></td><td>UI 변경 → 스냅샷 비교 → 머지</td></tr>
+          <tr><td>호스팅</td><td>Vercel</td><td>main 브랜치 자동 배포</td></tr>
+          <tr><td>환경변수</td><td>Vercel 대시보드</td><td><code>OPENAI_API_KEY</code> 등</td></tr>
+          <tr><td>PR 배포</td><td>Vercel Preview</td><td>PR마다 미리보기 URL 자동 생성</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+  </div>
+</body>
+</html>

@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>기획서 — gugbab-health</title>
+  <style>
+    :root {
+      --green: #22c55e;
+      --green-light: #bbf7d0;
+      --green-dark: #15803d;
+      --bg: #0f172a;
+      --bg2: #1e293b;
+      --bg3: #334155;
+      --text: #f1f5f9;
+      --text2: #94a3b8;
+      --border: #334155;
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 0 0 80px;
+    }
+    .topbar {
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .topbar a {
+      color: var(--text2);
+      text-decoration: none;
+      font-size: 0.875rem;
+    }
+    .topbar a:hover { color: var(--green); }
+    .topbar .sep { color: var(--border); }
+    .topbar .current { color: var(--text); font-weight: 600; }
+    .container { max-width: 860px; margin: 0 auto; padding: 48px 32px; }
+    .page-header { margin-bottom: 48px; }
+    .page-header .emoji { font-size: 3rem; margin-bottom: 16px; }
+    .page-header h1 { font-size: 2rem; font-weight: 700; margin-bottom: 8px; }
+    .page-header p { color: var(--text2); font-size: 1rem; }
+    .updated { color: var(--text2); font-size: 0.8rem; margin-top: 8px; }
+
+    section { margin-bottom: 48px; }
+    h2 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    h2 .num {
+      background: var(--green);
+      color: #000;
+      font-size: 0.75rem;
+      font-weight: 700;
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    th {
+      text-align: left;
+      color: var(--text2);
+      font-weight: 600;
+      padding: 10px 14px;
+      background: var(--bg3);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    th:first-child { border-radius: 8px 0 0 8px; }
+    th:last-child { border-radius: 0 8px 8px 0; }
+    td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+
+    .problem-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+    }
+    .problem-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+    .problem-card .icon { font-size: 1.5rem; margin-bottom: 10px; }
+    .problem-card p { color: var(--text2); font-size: 0.875rem; line-height: 1.6; }
+
+    .feature-list { display: flex; flex-direction: column; gap: 16px; }
+    .feature {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    .feature .fnum {
+      background: var(--green);
+      color: #000;
+      font-size: 0.75rem;
+      font-weight: 700;
+      width: 28px; height: 28px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .feature h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 6px; }
+    .feature p { color: var(--text2); font-size: 0.875rem; line-height: 1.6; }
+
+    .flow {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.875rem;
+      line-height: 1.8;
+      color: var(--text2);
+    }
+    .flow .highlight { color: var(--green); font-weight: 600; }
+
+    .tag {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .tag-a { background: rgba(34,197,94,0.15); color: var(--green); }
+    .tag-b { background: rgba(99,102,241,0.15); color: #a5b4fc; }
+    .tag-out { background: rgba(148,163,184,0.1); color: var(--text2); }
+
+    .goals-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+    }
+    .goal-chip {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .goal-chip .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      flex-shrink: 0;
+    }
+
+    .out-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .out-item {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 0.8rem;
+      color: var(--text2);
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <a href="../index.html">🥗 gugbab-health</a>
+    <span class="sep">/</span>
+    <span class="current">기획서</span>
+  </div>
+
+  <div class="container">
+    <div class="page-header">
+      <div class="emoji">📋</div>
+      <h1>기획서</h1>
+      <p>앱 개요 · 핵심 기능 · 사용자 흐름 · MVP 범위</p>
+      <p class="updated">최종 업데이트: 2026-06-27</p>
+    </div>
+
+    <!-- 1. 앱 개요 -->
+    <section>
+      <h2><span class="num">1</span> 앱 개요</h2>
+      <table>
+        <thead><tr><th>항목</th><th>내용</th></tr></thead>
+        <tbody>
+          <tr><td>앱 이름</td><td>gugbab-health</td></tr>
+          <tr><td>성격</td><td>1인용 개인화 식단 관리 PWA</td></tr>
+          <tr><td>목적</td><td>집에 있는 식재료와 내 신체 상태를 기반으로 AI가 오늘 먹을 식단을 추천해준다</td></tr>
+          <tr><td>플랫폼</td><td>웹 PWA (모바일·데스크탑 반응형)</td></tr>
+          <tr><td>배포</td><td>Vercel</td></tr>
+          <tr><td>데이터 저장</td><td>기기 로컬 (IndexedDB) — 서버 없음</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 2. 핵심 문제 -->
+    <section>
+      <h2><span class="num">2</span> 핵심 문제 정의</h2>
+      <div class="problem-grid">
+        <div class="problem-card">
+          <div class="icon">😩</div>
+          <p>매일 "오늘 뭐 먹지?" 고민하는 시간 낭비</p>
+        </div>
+        <div class="problem-card">
+          <div class="icon">🛒</div>
+          <p>냉장고 재료를 모르고 또 사는 비효율</p>
+        </div>
+        <div class="problem-card">
+          <div class="icon">🎯</div>
+          <p>목표는 있지만 어떻게 먹어야 할지 막막함</p>
+        </div>
+        <div class="problem-card">
+          <div class="icon">🔄</div>
+          <p>같은 메뉴 반복으로 질리는 문제</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. 핵심 기능 -->
+    <section>
+      <h2><span class="num">3</span> 핵심 기능</h2>
+      <div class="feature-list">
+        <div class="feature">
+          <div class="fnum">1</div>
+          <div>
+            <h3>식재료 관리</h3>
+            <p>집에 있는 식재료를 <strong>종류명만</strong> 등록 (그람수 없음). AI가 재료별 적정 섭취량과 요리법을 알아서 추천. 추가·삭제·목록 조회 가능.</p>
+          </div>
+        </div>
+        <div class="feature">
+          <div class="fnum">2</div>
+          <div>
+            <h3>신체 지표 추적</h3>
+            <p>핵심 수치 3가지만 기록: <strong>몸무게 · 체지방률 · 골격근량</strong>. 주기적으로 새 측정값 추가, 변화 추이 그래프 시각화. AI가 변화 추이를 참고해 식단 방향 조정.</p>
+          </div>
+        </div>
+        <div class="feature">
+          <div class="fnum">3</div>
+          <div>
+            <h3>AI 식단 추천 채팅 (메인)</h3>
+            <p>텍스트 채팅 인터페이스. AI가 질문하면서 A/B/C 선택지를 메시지로 제시, 사용자는 선택지 또는 자유 텍스트로 답변. 식재료·신체지표·목표·이전 이력 모두 context로 반영. 요리법·섭취량·영양 포인트까지 함께 제안.</p>
+          </div>
+        </div>
+        <div class="feature">
+          <div class="fnum">4</div>
+          <div>
+            <h3>목표(지향성) 설정 — 복수 선택</h3>
+            <div class="goals-grid" style="margin-top:12px">
+              <div class="goal-chip"><div class="dot"></div>체중 감량</div>
+              <div class="goal-chip"><div class="dot"></div>체중 증량</div>
+              <div class="goal-chip"><div class="dot"></div>체중 유지</div>
+              <div class="goal-chip"><div class="dot"></div>벌크업</div>
+              <div class="goal-chip"><div class="dot"></div>린매스</div>
+              <div class="goal-chip"><div class="dot"></div>건강 관리</div>
+            </div>
+          </div>
+        </div>
+        <div class="feature">
+          <div class="fnum">5</div>
+          <div>
+            <h3>이전 메뉴 중복 방지</h3>
+            <p>추천된 식단 이력을 로컬에 저장, AI context에 최근 N일 식단 포함. 추후 강제 중복 방지 로직 고도화 예정.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. 사용자 흐름 -->
+    <section>
+      <h2><span class="num">4</span> 사용자 흐름</h2>
+      <div class="flow">
+        <span class="highlight">첫 실행</span><br/>
+        &nbsp;&nbsp;└─ 온보딩 (성별 선택 → 목표 설정 → 첫 신체 지표)<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└─ <span class="highlight">식단 채팅 탭</span> (메인 화면)<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├─ AI와 대화로 오늘 식단 결정<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├─ <span class="highlight">식재료 탭</span>에서 재료 관리<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├─ <span class="highlight">신체지표 탭</span>에서 측정값 입력<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└─ <span class="highlight">설정 탭</span>에서 목표 수정
+      </div>
+    </section>
+
+    <!-- 5. AI 연동 방식 -->
+    <section>
+      <h2><span class="num">5</span> AI 연동 방식 (구현 시 결정)</h2>
+      <table>
+        <thead><tr><th>방식</th><th>설명</th><th>상태</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><span class="tag tag-a">A</span> 시스템 프롬프트 주입</td>
+            <td>스킬·에이전트 MD 내용을 system prompt로 삽입. 심플한 구현.</td>
+            <td>후보</td>
+          </tr>
+          <tr>
+            <td><span class="tag tag-b">B</span> Function Calling</td>
+            <td>스킬·에이전트를 OpenAI function으로 변환, AI가 직접 호출. 동적이고 확장성 높음.</td>
+            <td>후보</td>
+          </tr>
+        </tbody>
+      </table>
+      <p style="color:var(--text2);font-size:0.85rem;margin-top:12px">공통 원칙: AI provider 추상화 레이어 설계 → 추후 Claude 교체 가능</p>
+    </section>
+
+    <!-- 6. 비기능 요구사항 -->
+    <section>
+      <h2><span class="num">6</span> 비기능 요구사항</h2>
+      <table>
+        <thead><tr><th>항목</th><th>기준</th></tr></thead>
+        <tbody>
+          <tr><td>PWA 성능</td><td>Lighthouse PWA 점수 90+</td></tr>
+          <tr><td>오프라인</td><td>식재료·신체지표 조회는 오프라인 가능 (AI 채팅 제외)</td></tr>
+          <tr><td>시각 회귀</td><td>Playwright 스냅샷 비교 후 머지</td></tr>
+          <tr><td>접근성</td><td>기본 WCAG 2.1 A 준수</td></tr>
+          <tr><td>보안</td><td>OpenAI API 키 서버사이드(API Route)에서만 사용</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 7. MVP 범위 외 -->
+    <section>
+      <h2><span class="num">7</span> MVP 제외 항목</h2>
+      <div class="out-list">
+        <div class="out-item">회원가입 / 로그인</div>
+        <div class="out-item">클라우드 동기화</div>
+        <div class="out-item">영양성분 DB API</div>
+        <div class="out-item">바코드 스캔</div>
+        <div class="out-item">커뮤니티 / 공유</div>
+        <div class="out-item">알림 / 푸시</div>
+      </div>
+    </section>
+
+    <!-- 8. 향후 고도화 -->
+    <section>
+      <h2><span class="num">8</span> 향후 고도화 예정</h2>
+      <div class="out-list">
+        <div class="out-item">이전 메뉴 강제 중복 방지 로직</div>
+        <div class="out-item">식재료 유통기한 추적</div>
+        <div class="out-item">주간 식단 플래닝 뷰</div>
+        <div class="out-item">칼로리 자동 계산·시각화</div>
+        <div class="out-item">Claude 전환 옵션</div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

@@ -1,0 +1,59 @@
+{
+  "name": "gugbab-health",
+  "version": "0.1.0",
+  "private": true,
+  "description": "식재료 + 신체 지표 기반 AI 개인화 식단 PWA",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build --webpack",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome lint .",
+    "lint:fix": "biome lint --write .",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "check": "biome check .",
+    "check:fix": "biome check --write .",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
+    "test:visual": "playwright test",
+    "test:visual:update": "playwright test --update-snapshots",
+    "test:visual:report": "playwright show-report"
+  },
+  "dependencies": {
+    "@gugbab/hooks": "1.0.1",
+    "@gugbab/styled-radix": "1.0.2",
+    "@gugbab/tokens": "1.0.0",
+    "@gugbab/utils": "1.0.1",
+    "@serwist/next": "^9.5.11",
+    "idb": "^8.0.3",
+    "next": "16.2.6",
+    "openai": "^6.43.0",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "ulid": "^3.0.2",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.15",
+    "@gugbab/biome-config": "1.0.1",
+    "@playwright/test": "^1.60.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^4.7.0",
+    "happy-dom": "^20.10.6",
+    "serwist": "^9.5.11",
+    "sharp": "^0.34.5",
+    "typescript": "^5",
+    "vite": "^6.0.0",
+    "vitest": "^3.2.6"
+  }
+}

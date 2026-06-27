@@ -1,0 +1,24 @@
+.main {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding-bottom: calc(64px + env(safe-area-inset-bottom));
+}
+
+.placeholder {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--gugbab-color-fg-secondary);
+}
+
+.placeholder span {
+  font-size: 3rem;
+}
+
+.placeholder p {
+  font-size: 0.875rem;
+}

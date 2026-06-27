@@ -1,0 +1,37 @@
+# CLAUDE.md — gugbab-health
+
+Next.js App Router (TypeScript) — gugbab health 건 앱
+
+---
+
+## 필수 원칙
+
+- 복잡한 작업 전 계획 확인 → @.claude/rules/task-workflow.md
+
+---
+
+## 금지 사항
+
+- **커밋·푸시는 사용자가 명시적으로 요청할 때만 진행한다. 작업 완료 후 자동 커밋 제안·실행 금지**
+- 요청된 것만 수정한다. 요청 범위 밖의 코드는 건드리지 않는다
+- API 키·토큰·비밀번호를 파일에 직접 작성 금지
+- 검증되지 않은 외부 소스 그대로 복붙 금지
+- 테스트되지 않은 에이전트를 main 브랜치에 직접 커밋 금지
+- `use client` 남용 금지 — Server Component 기본, 상호작용 필요한 부분만 클라이언트 컴포넌트
+- `any` 타입 사용 금지 — `unknown` + 타입 가드로 대체
+- `console.log` 프로덕션 코드에 남기지 않기
+
+---
+
+## 규칙 참조
+
+| 상황 | 참조 파일 |
+|------|----------|
+| 작업 착수 전 확인 | @.claude/rules/task-workflow.md |
+| Git 커밋 컨벤션 | @.claude/rules/git.md |
+| 외부 정보 조사·검증 | @.claude/rules/info-verification.md |
+| TypeScript 코딩 규칙 | @.claude/rules/typescript.md |
+| 에이전트 설계·작성 | @.claude/rules/agent-design.md |
+| 슬래시 커맨드 작성 | @.claude/rules/commands.md |
+| README 업데이트 | @.claude/rules/readme-update.md |
+| Codex 적대적 코드 리뷰 | @.claude/rules/codex-review.md |

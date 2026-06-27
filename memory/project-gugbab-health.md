@@ -14,6 +14,17 @@ metadata:
 
 **How to apply:** 설계·기획 단계에서 이 두 축(식재료 관리 + 신체 지표 기반 식단 추천)을 항상 중심에 두고 판단한다.
 
+## 확정된 기술스택
+
+- **프레임워크**: Next.js (App Router) + TypeScript
+- **PWA**: @serwist/next (dream 앱 동일)
+- **UI 패키지**: @gugbab/styled-radix + @gugbab/tokens
+- **DB**: IndexedDB 로컬 전용 (idb 또는 Dexie)
+- **AI**: OpenAI SDK (API Route로 서버사이드 호출)
+- **린트**: Biome (@gugbab/biome-config)
+- **테스트**: Playwright 시각 회귀
+- **배포**: Vercel
+
 ## 확정된 방향
 
 - **플랫폼**: 웹 PWA → Vercel 배포

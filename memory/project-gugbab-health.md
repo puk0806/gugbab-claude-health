@@ -40,5 +40,5 @@ metadata:
 
 - **Phase 1** (기반 세팅): ✅ 완료 — 라우팅·DB(IndexedDB)·테스트 환경
 - **Phase 2** (핵심 UI): ✅ 완료 — 온보딩·식재료·신체지표·설정·홈 화면 + Playwright 시각 회귀 테스트 + GitHub Actions VRT 워크플로우 + main 브랜치 보호(visual-regression required status check)
-- **Phase 3** (AI 채팅): ⏳ 미시작 — OpenAI API 연동, 대화형 식단 추천 UI
+- **Phase 3** (AI 채팅): ✅ 완료 — OpenAI 스트리밍 API Route, 동적 context 주입(방식 A), 채팅 UI, IndexedDB 이력 저장. Function Calling(방식 B)·이전 식단 이력 summary는 Phase 5로 이동
 - **Phase 4** (E2E 통합 테스트): ⏳ 미시작

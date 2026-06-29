@@ -1,0 +1,92 @@
+.main {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: 56px 24px 40px;
+  gap: 32px;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--gugbab-color-fg-primary);
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--gugbab-color-fg-secondary);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--gugbab-color-fg-primary);
+}
+
+.genderGroup {
+  display: flex;
+  gap: 12px;
+}
+
+.goalGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.chip {
+  padding: 10px 20px;
+  border: 1.5px solid var(--gugbab-color-border-subtle);
+  border-radius: 100px;
+  background: transparent;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--gugbab-color-fg-primary);
+  cursor: pointer;
+}
+
+.chip.selected {
+  border-color: #22c55e;
+  background: rgba(34, 197, 94, 0.08);
+  color: #22c55e;
+}
+
+.genderGroup .chip {
+  flex: 1;
+}
+
+.footer {
+  margin-top: auto;
+}
+
+.saveBtn {
+  width: 100%;
+  padding: 16px;
+  border: none;
+  border-radius: 14px;
+  background: #22c55e;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.saveBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

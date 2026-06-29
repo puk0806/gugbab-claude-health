@@ -1,6 +1,6 @@
 ---
 name: feedback-e2e-verification-before-report
-description: 작업 완료 보고 전 크리티컬 패스 직접 검증 필수 — 특히 CI/CD 플로우
+description: 완료 = 동작 확인. 테스트 없이 완료 보고 절대 금지
 metadata: 
   node_type: memory
   type: feedback

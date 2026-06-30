@@ -1,5 +1,5 @@
 {
-  "name": "gugbab-health",
+  "name": "건강식단",
   "short_name": "건강식단",
   "description": "식재료 + 신체 지표 기반 AI 개인화 식단 PWA",
   "start_url": "/",

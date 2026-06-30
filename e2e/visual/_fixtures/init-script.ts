@@ -27,6 +27,14 @@ export interface SeedData {
         skeletalMuscleMass?: number;
         recordedAt: string;
     }>;
+    mealHistory?: Array<{
+        id: string;
+        date: string;
+        messages: Array<{ role: "user" | "assistant"; content: string }>;
+        summary?: string;
+        createdAt: string;
+        updatedAt: string;
+    }>;
 }
 
 export const SEED_PROFILE: NonNullable<SeedData["userProfile"]> = {
@@ -41,6 +49,19 @@ export const SEED_INGREDIENTS: NonNullable<SeedData["ingredients"]> = [
     { id: "ing-001", name: "닭가슴살", category: "protein", addedAt: "2026-06-25T00:00:00.000Z" },
     { id: "ing-002", name: "브로콜리", category: "vegetable-fruit", addedAt: "2026-06-25T00:01:00.000Z" },
     { id: "ing-003", name: "현미밥", category: "grain", addedAt: "2026-06-25T00:02:00.000Z" },
+];
+
+export const SEED_MEAL_HISTORY: NonNullable<SeedData["mealHistory"]> = [
+    {
+        id: "meal-001",
+        date: "2026-06-30",
+        messages: [
+            { role: "user", content: "닭가슴살이랑 계란 있는데 저녁 식단 추천해줘" },
+            { role: "assistant", content: "닭가슴살 브로콜리 스크램블 에그를 추천드려요! 단백질과 식이섬유가 풍부해 체중 감량에 효과적이에요." },
+        ],
+        createdAt: "2026-06-30T10:00:00.000Z",
+        updatedAt: "2026-06-30T10:01:00.000Z",
+    },
 ];
 
 export const SEED_BODY_METRICS: NonNullable<SeedData["bodyMetrics"]> = [

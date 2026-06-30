@@ -7,7 +7,7 @@
  * addInitScript + 비동기 IDB는 useEffect와 경쟁 조건이 발생해 불안정.
  */
 import { expect, type Page, test } from "@playwright/test";
-import { SEED_BODY_METRICS, SEED_INGREDIENTS, SEED_PROFILE, type SeedData } from "./_fixtures/init-script";
+import { SEED_BODY_METRICS, SEED_INGREDIENTS, SEED_MEAL_HISTORY, SEED_PROFILE, type SeedData } from "./_fixtures/init-script";
 
 /**
  * /onboarding으로 먼저 이동해 same-origin context를 확보한 뒤,
@@ -47,6 +47,7 @@ async function seedAndGoto(page: Page, url: string, data: SeedData): Promise<voi
                         if (d.userProfile) storeNames.push("userProfile");
                         if (d.ingredients?.length) storeNames.push("ingredients");
                         if (d.bodyMetrics?.length) storeNames.push("bodyMetrics");
+                        if (d.mealHistory?.length) storeNames.push("mealHistory");
                         if (storeNames.length === 0) {
                             db.close();
                             resolve();
@@ -61,6 +62,10 @@ async function seedAndGoto(page: Page, url: string, data: SeedData): Promise<voi
                         if (d.bodyMetrics?.length) {
                             const s = tx.objectStore("bodyMetrics");
                             for (const item of d.bodyMetrics) s.put(item);
+                        }
+                        if (d.mealHistory?.length) {
+                            const s = tx.objectStore("mealHistory");
+                            for (const item of d.mealHistory) s.put(item);
                         }
                         tx.oncomplete = () => {
                             db.close();
@@ -127,10 +132,22 @@ test.describe("routes — visual regression", () => {
         await expect(page).toHaveScreenshot("settings.png", { fullPage: true });
     });
 
-    // chat (홈): 프로필 있음 → placeholder 표시
-    test("chat", async ({ page }) => {
+    // chat (홈): 프로필 있음 → 빈 채팅 화면
+    test("chat-empty", async ({ page }) => {
         await seedAndGoto(page, "/", { userProfile: SEED_PROFILE });
-        await expect(page.getByText("식단 채팅 — Phase 3에서 구현")).toBeVisible();
-        await expect(page).toHaveScreenshot("chat.png", { fullPage: true });
+        await expect(page.getByText("안녕하세요! 오늘 어떤 식단을 원하시나요?")).toBeVisible();
+        await expect(page).toHaveScreenshot("chat-empty.png", { fullPage: true });
+    });
+
+    // chat (홈): 오늘 대화 이력 있음 → 메시지 복원
+    test("chat-with-messages", async ({ page }) => {
+        await seedAndGoto(page, "/", {
+            userProfile: SEED_PROFILE,
+            ingredients: SEED_INGREDIENTS,
+            bodyMetrics: SEED_BODY_METRICS,
+            mealHistory: SEED_MEAL_HISTORY,
+        });
+        await expect(page.getByText("닭가슴살이랑 계란 있는데 저녁 식단 추천해줘")).toBeVisible();
+        await expect(page).toHaveScreenshot("chat-with-messages.png", { fullPage: true });
     });
 });

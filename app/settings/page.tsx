@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { InstallButton } from "@/components/install/InstallButton";
 import BottomNav from "@/components/layout/BottomNav";
 import type { Gender, Goal, UserProfile } from "@/lib/db/types";
 import { getUserProfile, saveUserProfile } from "@/lib/db/userProfile";
@@ -105,6 +106,12 @@ export default function SettingsPage() {
                     >
                         {saving ? "저장 중..." : "저장"}
                     </button>
+
+                    <section className={styles.section}>
+                        <h2 className={styles.sectionTitle}>앱 설치</h2>
+                        <p className={styles.installDesc}>홈 화면에 추가하면 앱처럼 빠르게 실행할 수 있어요.</p>
+                        <InstallButton />
+                    </section>
                 </div>
             )}
 

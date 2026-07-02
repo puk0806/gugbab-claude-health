@@ -51,16 +51,24 @@ export const SEED_INGREDIENTS: NonNullable<SeedData["ingredients"]> = [
     { id: "ing-003", name: "현미밥", category: "grain", addedAt: "2026-06-25T00:02:00.000Z" },
 ];
 
+function todayLocalDate(): string {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+}
+
 export const SEED_MEAL_HISTORY: NonNullable<SeedData["mealHistory"]> = [
     {
         id: "meal-001",
-        date: "2026-06-30",
+        date: todayLocalDate(),
         messages: [
             { role: "user", content: "닭가슴살이랑 계란 있는데 저녁 식단 추천해줘" },
             { role: "assistant", content: "닭가슴살 브로콜리 스크램블 에그를 추천드려요! 단백질과 식이섬유가 풍부해 체중 감량에 효과적이에요." },
         ],
-        createdAt: "2026-06-30T10:00:00.000Z",
-        updatedAt: "2026-06-30T10:01:00.000Z",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
     },
 ];
 

@@ -89,6 +89,14 @@ describe("POST /api/chat (health relay proxy)", () => {
         expect(res.status).toBe(200);
     });
 
+    it("범위 밖 heightCm(30)에 400 반환", async () => {
+        const { POST } = await import("./route");
+        const res = await POST(
+            makeReq({ ...VALID_BODY, context: { ...VALID_BODY.context, heightCm: 30 } }),
+        );
+        expect(res.status).toBe(400);
+    });
+
     it("잘못된 mealPlanMode에 400 반환", async () => {
         const { POST } = await import("./route");
         const res = await POST(

@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { toSSELine } from "@gugbab/utils";
 import { buildSystemPrompt } from "@/lib/ai/context";
+import { BODY_LIMITS } from "@/lib/ai/limits";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -21,8 +22,8 @@ const IngredientSchema = z.object({
 const UserContextSchema = z.object({
     gender: z.enum(["male", "female"]),
     goals: z.array(z.enum(["lose-weight", "gain-weight", "maintain-weight", "lean-mass", "health"])),
-    heightCm: z.number().positive().max(300).optional(),
-    weightKg: z.number().positive().max(500).optional(),
+    heightCm: z.number().min(BODY_LIMITS.heightCm.min).max(BODY_LIMITS.heightCm.max).optional(),
+    weightKg: z.number().min(BODY_LIMITS.weightKg.min).max(BODY_LIMITS.weightKg.max).optional(),
     recentMetrics: z.array(MetricSchema),
     ingredients: z.array(IngredientSchema),
     recentMealSummaries: z.array(z.string()),

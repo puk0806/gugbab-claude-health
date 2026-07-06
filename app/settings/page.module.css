@@ -125,3 +125,16 @@
   font-size: 0.75rem;
   color: var(--gugbab-color-fg-muted);
 }
+
+.fieldError {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--gugbab-color-danger-base, #e5484d);
+}
+
+.fieldGroup {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}

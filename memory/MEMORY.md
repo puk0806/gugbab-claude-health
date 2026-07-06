@@ -6,3 +6,4 @@
 - [AI 통합 아키텍처](architecture-ai-integration.md) — OpenAI 기반, 스킬·에이전트를 OpenAI tools로 노출 ⚠️ 핵심 요구사항
 - [커밋·푸시 규율](feedback-commit-push-discipline.md) — 명시적 요청 없이 절대 실행 금지, 퍼미션 프롬프트 승인도 요청 대체 불가
 - [완료 보고 전 검증 의무](feedback-e2e-verification-before-report.md) — CI/CD 플로우 등 크리티컬 패스는 직접 검증 후 보고
+- [회사망 TLS 인터셉션](env-corp-tls-interception.md) — 로컬 Node fetch가 외부 HTTPS 실패 시 NODE_EXTRA_CA_CERTS 우회, relay 로컬은 :3000

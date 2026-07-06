@@ -8,6 +8,8 @@ export interface UserProfile {
     id: string;
     gender: Gender;
     goals: Goal[];
+    heightCm?: number;
+    weightKg?: number;
     createdAt: string;
     updatedAt: string;
 }

@@ -8,7 +8,12 @@ export async function getUserProfile(): Promise<UserProfile | undefined> {
     return db.get("userProfile", PROFILE_KEY);
 }
 
-export async function saveUserProfile(data: { gender: Gender; goals: Goal[] }): Promise<UserProfile> {
+export async function saveUserProfile(data: {
+    gender: Gender;
+    goals: Goal[];
+    heightCm?: number;
+    weightKg?: number;
+}): Promise<UserProfile> {
     const db = await getDB();
     const existing = await getUserProfile();
     const now = new Date().toISOString();

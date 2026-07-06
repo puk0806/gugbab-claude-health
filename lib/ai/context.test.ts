@@ -64,4 +64,38 @@ describe("buildSystemPrompt", () => {
         const p = buildSystemPrompt({ ...BASE, recentMealSummaries: ["2026-06-26: 닭가슴살 샐러드"] });
         expect(p).toContain("닭가슴살 샐러드");
     });
+
+    it("키를 프로필에 포함한다", () => {
+        const p = buildSystemPrompt({ ...BASE, heightCm: 178 });
+        expect(p).toContain("178cm");
+    });
+
+    it("지표 기록이 없으면 기본 몸무게를 사용한다", () => {
+        const p = buildSystemPrompt({ ...BASE, recentMetrics: [], weightKg: 78 });
+        expect(p).toContain("78kg");
+        expect(p).toContain("기본 몸무게");
+    });
+
+    it("지표 기록이 있으면 기본 몸무게는 표기하지 않는다", () => {
+        const p = buildSystemPrompt({ ...BASE, weightKg: 78 });
+        expect(p).not.toContain("기본 몸무게");
+    });
+
+    it("pantry-only 모드는 보유 재료 강제 지침을 포함한다", () => {
+        const p = buildSystemPrompt({ ...BASE, mealPlanMode: "pantry-only" });
+        expect(p).toContain("보유 식재료 목록에 있는 재료만");
+        expect(p).toContain("절대 포함하지 마세요");
+    });
+
+    it("free 모드는 자유 추천 지침 + 구매 목록 안내를 포함한다", () => {
+        const p = buildSystemPrompt({ ...BASE, mealPlanMode: "free" });
+        expect(p).toContain("자유롭게 추천");
+        expect(p).toContain("구매 목록");
+    });
+
+    it("모드 미지정 시 기존 지침을 유지한다", () => {
+        const p = buildSystemPrompt(BASE);
+        expect(p).toContain("현재 식재료로 만들 수 있는 실제 식단");
+        expect(p).not.toContain("절대 포함하지 마세요");
+    });
 });

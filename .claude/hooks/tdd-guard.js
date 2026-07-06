@@ -23,18 +23,12 @@ try {
     filePath.includes('.claude/hooks') ||
     filePath.includes('.claude/commands') ||
     /(?:^|\/)scripts\//.test(filePath) ||
-    // 설정·인프라 전용 파일 (Service Worker, 빌드·배포·테스트 러너 설정)
-    /(?:^|\/)next\.config\.[tj]s$/.test(filePath) ||
-    /(?:^|\/)vitest\.config\.[tj]s$/.test(filePath) ||
-    /(?:^|\/)vitest\.setup\.[tj]sx?$/.test(filePath) ||
-    /(?:^|\/)app\/sw\.ts$/.test(filePath) ||
-    /(?:^|\/)playwright\.config\.[tj]s$/.test(filePath) ||
-    /(?:^|\/)e2e\//.test(filePath) ||
-    // lib/db·lib/ai: IndexedDB·외부 AI API는 브라우저/네트워크 의존 → vitest 단독 테스트 불가
-    // 테스트 전략: Playwright E2E (Phase 4) 또는 fake-indexeddb 도입 후 별도 작업으로 추가
-    /(?:^|\/)lib\/db\//.test(filePath) ||
-    /(?:^|\/)lib\/ai\//.test(filePath) ||
-    /(?:^|\/)public\//.test(filePath)
+    // *.config.ts / *.config.js / *.config.mjs 등 순수 설정 파일
+    /\.config\.[a-z]+$/.test(path.basename(filePath)) ||
+    // Service Worker (브라우저 환경 의존, 단위 테스트 불가)
+    basename === 'sw' ||
+    // DB 커넥션 셋업 (통합 테스트로만 검증 가능)
+    /(?:^|\/)lib\/db\//.test(filePath)
   ) {
     process.exit(0);
   }

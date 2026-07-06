@@ -4,12 +4,16 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSSEChat } from "@gugbab/hooks";
 import { capitalize } from "@gugbab/utils";
+import ChatInputBar from "@/components/chat/ChatInputBar";
+import MealPlanModeBanner from "@/components/chat/MealPlanModeBanner";
+import ModelSheet from "@/components/chat/ModelSheet";
 import BottomNav from "@/components/layout/BottomNav";
 import { getLatestBodyMetrics } from "@/lib/db/bodyMetrics";
 import { getAllIngredients } from "@/lib/db/ingredients";
 import { getTodayMealHistory, saveMealHistory } from "@/lib/db/mealHistory";
 import type { ChatMessage } from "@/lib/db/types";
 import { getUserProfile } from "@/lib/db/userProfile";
+import { BODY_LIMITS, isInRange, type NumberRange } from "@/lib/ai/limits";
 import type { MealPlanMode, ModelInfo, ModelsResponse, UserContext } from "@/lib/ai/types";
 import styles from "./page.module.css";
 
@@ -18,6 +22,11 @@ const FALLBACK_MODEL = "sonnet";
 const GENERIC_ERROR = "오류가 발생했어요. 잠시 후 다시 시도해주세요.";
 // 이 개수 미만이면 "보유 재료로만 vs 자유 추천" 선택을 강제한다
 const SCARCE_INGREDIENT_THRESHOLD = 3;
+
+// 과거 규칙으로 저장된 범위 밖 값이 채팅 400을 유발하지 않도록 컨텍스트에서 제외
+function sanitizeBodyValue(value: number | undefined, range: NumberRange): number | undefined {
+    return value !== undefined && isInRange(value, range) ? value : undefined;
+}
 
 function loadStoredModel(): string {
     if (typeof window === "undefined") return FALLBACK_MODEL;
@@ -74,8 +83,8 @@ export default function ChatPage() {
             setContext({
                 gender: profile.gender,
                 goals: profile.goals,
-                heightCm: profile.heightCm,
-                weightKg: profile.weightKg,
+                heightCm: sanitizeBodyValue(profile.heightCm, BODY_LIMITS.heightCm),
+                weightKg: sanitizeBodyValue(profile.weightKg, BODY_LIMITS.weightKg),
                 recentMetrics: [...metrics].reverse().map((m) => ({
                     date: m.date,
                     weight: m.weight,
@@ -133,15 +142,6 @@ export default function ChatPage() {
         bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages, text]);
 
-    useEffect(() => {
-        if (!sheetOpen) return;
-        function onKeyDown(e: KeyboardEvent) {
-            if (e.key === "Escape") setSheetOpen(false);
-        }
-        window.addEventListener("keydown", onKeyDown);
-        return () => window.removeEventListener("keydown", onKeyDown);
-    }, [sheetOpen]);
-
     const ingredientsScarce =
         context !== null && context.ingredients.length < SCARCE_INGREDIENT_THRESHOLD;
     // 식재료 부족 시 추천 방식 선택은 강제 — 선택 전에는 전송 불가
@@ -177,13 +177,6 @@ export default function ChatPage() {
             // 저장 실패는 무시 — 세션 내 선택은 유지된다
         }
         setSheetOpen(false);
-    }
-
-    function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-        if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            handleSend();
-        }
     }
 
     if (!context) return null;
@@ -242,88 +235,24 @@ export default function ChatPage() {
             </div>
 
             {sheetOpen && models && (
-                // biome-ignore lint/a11y/useKeyWithClickEvents: backdrop click-to-close (ESC 별도 처리)
-                <div
-                    className={styles.sheetBackdrop}
-                    onClick={(e) => {
-                        if (e.target === e.currentTarget) setSheetOpen(false);
-                    }}
-                    role="dialog"
-                    aria-modal="true"
-                    aria-label="모델 선택"
-                >
-                    <div className={styles.sheet}>
-                        <div className={styles.sheetTitle}>
-                            모델 선택 <small>다음 메시지부터 적용</small>
-                        </div>
-                        {models.map((m) => (
-                            <button
-                                key={m.alias}
-                                type="button"
-                                className={m.alias === model ? styles.modelRowSelected : styles.modelRow}
-                                onClick={() => handleSelectModel(m.alias)}
-                            >
-                                <span className={styles.modelCheck} aria-hidden>
-                                    {m.alias === model ? "✓" : ""}
-                                </span>
-                                <span className={styles.modelInfo}>
-                                    <span className={styles.modelName}>
-                                        {m.name}
-                                        {m.description.includes("비용 높음") && (
-                                            <span className={styles.modelCostBadge}>비용 높음</span>
-                                        )}
-                                    </span>
-                                    <span className={styles.modelDesc}>{m.description}</span>
-                                </span>
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {needsModeChoice && (
-                <div className={styles.modeBanner}>
-                    <p className={styles.modeBannerText}>
-                        등록된 식재료가 부족해요. 어떻게 추천해드릴까요?
-                    </p>
-                    <div className={styles.modeChips}>
-                        <button
-                            type="button"
-                            className={styles.modeChip}
-                            onClick={() => setMealPlanMode("pantry-only")}
-                        >
-                            보유 재료로만
-                        </button>
-                        <button
-                            type="button"
-                            className={styles.modeChip}
-                            onClick={() => setMealPlanMode("free")}
-                        >
-                            자유롭게 추천
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            <div className={styles.inputBar}>
-                <input
-                    ref={inputRef}
-                    className={styles.input}
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder="식단을 요청해보세요..."
-                    disabled={streaming}
+                <ModelSheet
+                    models={models}
+                    selected={model}
+                    onSelect={handleSelectModel}
+                    onClose={() => setSheetOpen(false)}
                 />
-                <button
-                    type="button"
-                    className={styles.sendBtn}
-                    onClick={handleSend}
-                    disabled={!input.trim() || streaming || needsModeChoice}
-                >
-                    전송
-                </button>
-            </div>
+            )}
+
+            {needsModeChoice && <MealPlanModeBanner onSelect={setMealPlanMode} />}
+
+            <ChatInputBar
+                value={input}
+                onChange={setInput}
+                onSend={handleSend}
+                disabled={streaming}
+                sendBlocked={needsModeChoice}
+                inputRef={inputRef}
+            />
 
             <BottomNav active="chat" />
         </main>

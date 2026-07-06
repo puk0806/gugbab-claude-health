@@ -360,5 +360,22 @@ describe("ChatPage", () => {
             expect(body.context.heightCm).toBe(178);
             expect(body.context.weightKg).toBe(78);
         });
+
+        it("범위 밖 저장값은 컨텍스트에서 제외한다 (과거 데이터 방어)", async () => {
+            vi.mocked(getUserProfile).mockResolvedValue({
+                ...MOCK_PROFILE,
+                heightCm: 30,
+                weightKg: 78,
+            });
+            await renderAndWaitInput();
+            fireEvent.click(screen.getByRole("button", { name: "자유롭게 추천" }));
+            typeAndSend("식단 짜줘");
+
+            const body = sendMock.mock.calls[0][0] as {
+                context: { heightCm?: number; weightKg?: number };
+            };
+            expect(body.context.heightCm).toBeUndefined();
+            expect(body.context.weightKg).toBe(78);
+        });
     });
 });

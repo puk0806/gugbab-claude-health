@@ -17,11 +17,19 @@ const GOAL_LABELS: Record<Goal, string> = {
 
 const GOALS = Object.entries(GOAL_LABELS) as [Goal, string][];
 
+// 상한은 /api/chat 스키마와 동일하게 유지 — 저장은 되는데 채팅이 400 나는 함정 방지
+function parsePositiveNumber(value: string, max: number): number | undefined {
+    const n = Number(value);
+    return value.trim() !== "" && Number.isFinite(n) && n > 0 && n <= max ? n : undefined;
+}
+
 export default function SettingsPage() {
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
     const [gender, setGender] = useState<Gender>("male");
     const [goals, setGoals] = useState<Goal[]>([]);
+    const [height, setHeight] = useState("");
+    const [weight, setWeight] = useState("");
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
@@ -31,6 +39,8 @@ export default function SettingsPage() {
                     setProfile(p);
                     setGender(p.gender);
                     setGoals(p.goals);
+                    setHeight(p.heightCm !== undefined ? String(p.heightCm) : "");
+                    setWeight(p.weightKg !== undefined ? String(p.weightKg) : "");
                 }
                 setLoading(false);
             })
@@ -47,7 +57,12 @@ export default function SettingsPage() {
         if (goals.length === 0) return;
         setSaving(true);
         try {
-            const updated = await saveUserProfile({ gender, goals });
+            const updated = await saveUserProfile({
+                gender,
+                goals,
+                heightCm: parsePositiveNumber(height, 300),
+                weightKg: parsePositiveNumber(weight, 500),
+            });
             setProfile(updated);
         } finally {
             setSaving(false);
@@ -96,6 +111,41 @@ export default function SettingsPage() {
                                 </button>
                             ))}
                         </div>
+                    </section>
+
+                    <section className={styles.section}>
+                        <h2 className={styles.sectionTitle}>신체 정보</h2>
+                        <div className={styles.bodyFields}>
+                            <label className={styles.fieldLabel} htmlFor="height-input">
+                                키 (cm)
+                                <input
+                                    id="height-input"
+                                    type="number"
+                                    inputMode="decimal"
+                                    min={0}
+                                    className={styles.fieldInput}
+                                    value={height}
+                                    onChange={(e) => setHeight(e.target.value)}
+                                    placeholder="예: 175"
+                                />
+                            </label>
+                            <label className={styles.fieldLabel} htmlFor="weight-input">
+                                몸무게 (kg)
+                                <input
+                                    id="weight-input"
+                                    type="number"
+                                    inputMode="decimal"
+                                    min={0}
+                                    className={styles.fieldInput}
+                                    value={weight}
+                                    onChange={(e) => setWeight(e.target.value)}
+                                    placeholder="예: 70"
+                                />
+                            </label>
+                        </div>
+                        <p className={styles.fieldHint}>
+                            신체 지표 기록이 없을 때 식단 추천의 기준으로 사용돼요.
+                        </p>
                     </section>
 
                     <button

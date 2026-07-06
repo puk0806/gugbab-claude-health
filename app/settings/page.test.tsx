@@ -1,6 +1,6 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getUserProfile } from "@/lib/db/userProfile";
+import { getUserProfile, saveUserProfile } from "@/lib/db/userProfile";
 import SettingsPage from "./page";
 
 vi.mock("@/components/layout/BottomNav", () => ({
@@ -59,5 +59,73 @@ describe("SettingsPage", () => {
 
         render(<SettingsPage />);
         await waitFor(() => expect(screen.getByRole("button", { name: "체중 감량" })).toBeInTheDocument());
+    });
+
+    describe("키·몸무게 입력", () => {
+        beforeEach(() => {
+            vi.mocked(saveUserProfile).mockClear();
+            vi.mocked(getUserProfile).mockResolvedValue({
+                id: "user-profile",
+                gender: "male",
+                goals: ["health"],
+                heightCm: 178,
+                weightKg: 78.5,
+                createdAt: "",
+                updatedAt: "",
+            });
+        });
+
+        it("저장된 키·몸무게를 입력 필드에 표시한다", async () => {
+            render(<SettingsPage />);
+            await waitFor(() => {
+                expect(screen.getByLabelText("키 (cm)")).toHaveValue(178);
+                expect(screen.getByLabelText("몸무게 (kg)")).toHaveValue(78.5);
+            });
+        });
+
+        it("키·몸무게 수정 후 저장 시 saveUserProfile에 포함한다", async () => {
+            render(<SettingsPage />);
+            await waitFor(() => screen.getByLabelText("키 (cm)"));
+
+            fireEvent.change(screen.getByLabelText("키 (cm)"), { target: { value: "180" } });
+            fireEvent.change(screen.getByLabelText("몸무게 (kg)"), { target: { value: "80" } });
+            fireEvent.click(screen.getByRole("button", { name: "저장" }));
+
+            await waitFor(() =>
+                expect(saveUserProfile).toHaveBeenCalledWith(
+                    expect.objectContaining({ heightCm: 180, weightKg: 80 }),
+                ),
+            );
+        });
+
+        it("API 허용 범위 초과 값은 undefined로 저장한다 (채팅 400 방지)", async () => {
+            render(<SettingsPage />);
+            await waitFor(() => screen.getByLabelText("키 (cm)"));
+
+            fireEvent.change(screen.getByLabelText("키 (cm)"), { target: { value: "301" } });
+            fireEvent.change(screen.getByLabelText("몸무게 (kg)"), { target: { value: "501" } });
+            fireEvent.click(screen.getByRole("button", { name: "저장" }));
+
+            await waitFor(() =>
+                expect(saveUserProfile).toHaveBeenCalledWith(
+                    expect.objectContaining({ heightCm: undefined, weightKg: undefined }),
+                ),
+            );
+        });
+
+        it("빈 값이면 undefined로 저장한다", async () => {
+            render(<SettingsPage />);
+            await waitFor(() => screen.getByLabelText("키 (cm)"));
+
+            fireEvent.change(screen.getByLabelText("키 (cm)"), { target: { value: "" } });
+            fireEvent.change(screen.getByLabelText("몸무게 (kg)"), { target: { value: "" } });
+            fireEvent.click(screen.getByRole("button", { name: "저장" }));
+
+            await waitFor(() =>
+                expect(saveUserProfile).toHaveBeenCalledWith(
+                    expect.objectContaining({ heightCm: undefined, weightKg: undefined }),
+                ),
+            );
+        });
     });
 });

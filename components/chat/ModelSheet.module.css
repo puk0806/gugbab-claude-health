@@ -1,7 +1,8 @@
 .sheetBackdrop {
   position: fixed;
   inset: 0;
-  z-index: 20;
+  /* BottomNav(z-index: 100)보다 위 — 시트 마지막 항목이 네비에 가려지지 않게 */
+  z-index: 200;
   background: var(--gugbab-color-overlay);
   display: flex;
   align-items: flex-end;

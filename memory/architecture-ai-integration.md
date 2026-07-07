@@ -1,28 +1,19 @@
 ---
 name: architecture-ai-integration
-description: "AI 통합 아키텍처 — OpenAI 기반, 스킬·에이전트를 OpenAI tools로 노출 (핵심 요구사항)"
+description: AI 통합 아키텍처 — gugbab-claude-relay 경유 Claude 호출 (OpenAI 계획은 폐기됨)
 metadata: 
   node_type: memory
   type: project
-  originSessionId: b9edb9ce-c780-4548-aaac-3b9201f65045
+  originSessionId: 129f65e5-2b78-4b68-a65e-571f8f9d9d0e
 ---
 
-## AI 제공자
+## 현재 아키텍처 (2026-07-07 프로덕션 반영 완료)
 
-- **현재**: OpenAI (GPT) — dream 앱과 동일한 SDK 패턴
-- **미래**: Claude(Anthropic)로 전환 가능성 있음 → 추상화 레이어 고려
+- **AI 제공자**: Claude — 별도 서버 **gugbab-claude-relay**(`05_gugbab-claude-relay`, https://gugbab-claude-relay.vercel.app) 경유. ~~OpenAI~~ 계획은 폐기.
+- **호출 경로**: 브라우저 → health `/api/chat`(서버 프록시) → relay `/api/chat` → Claude. 브라우저가 relay를 직접 호출하지 않음(CORS·시크릿 보호).
+- **인증**: `X-Relay-Secret` 헤더 (env: `RELAY_URL`, `RELAY_SECRET` — 로컬 .env.local + Vercel 양쪽).
+- **스킬 주입**: 과거 "OpenAI tools로 스킬 노출" 요구는 relay 방식으로 실현 — relay가 `app: "health"` 기준으로 자체 SKILL.md 5종(영양 도메인)을 시스템 프롬프트에 자동 주입. 요청별 컨텍스트(신체·식재료·mealPlanMode)는 health의 `lib/ai/context.ts` `buildSystemPrompt`가 생성해 함께 전달.
+- **모델**: relay `GET /api/models`가 목록(haiku/sonnet/opus/fable)과 기본값(sonnet)을 내려줌 — 앱에 하드코딩 금지, health의 `/api/models` 프록시로 전달. 사용자 선택은 localStorage.
+- **SSE 규약**: `data: {type: chunk|done|error}` — `@gugbab/utils`의 `toSSELine`/`SseEvent`, 클라이언트는 `@gugbab/hooks`의 `useSSEChat`. relay 오류·transport 실패는 모두 SSE error 이벤트(HTTP 200)로 변환하는 게 설계 규약.
 
-## 핵심 요구사항 ⚠️
-
-**사용자의 스킬(.claude/skills/)과 에이전트(.claude/agents/)를 OpenAI가 사용할 수 있게 노출해야 한다.**
-
-이것은 단순 AI 호출이 아니라 기존 gugbab 워크플로우 자산을 OpenAI function calling tools로 연결하는 것.
-
-**구현 방향 (A 또는 B — 구현 시점에 재결정):**
-- **A) 시스템 프롬프트 주입**: 스킬 MD → system prompt 텍스트 삽입 (심플)
-- **B) Function Calling**: 스킬·에이전트 → OpenAI function definition 변환 (동적, 확장성)
-- MCP는 MVP 범위 제외
-- 두 방식 중 결정 시점이 오면 사용자에게 다시 질문할 것
-
-**Why:** 사용자가 Claude Code에서 쌓아온 스킬·에이전트 자산을 앱에서도 재사용하고 싶음.
-**How to apply:** 설계 시 OpenAI function calling 또는 MCP 연동 구조를 반드시 포함. AI 제공자 추상화 레이어 설계 필수.
+**How to apply:** AI 관련 변경 시 relay 스펙(`05_gugbab-claude-relay/lib/schema.ts`)이 계약의 단일 소스. 요청별 규칙은 health의 systemPrompt에, 도메인 지식은 relay 스킬에 둔다.

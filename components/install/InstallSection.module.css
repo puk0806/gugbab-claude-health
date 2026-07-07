@@ -1,0 +1,19 @@
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--gugbab-color-fg-primary);
+}
+
+.desc {
+  margin: 0 0 2px;
+  font-size: 0.8125rem;
+  color: var(--gugbab-color-fg-secondary);
+  line-height: 1.5;
+}

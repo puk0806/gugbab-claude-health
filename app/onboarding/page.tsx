@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { InstallSection } from "@/components/install/InstallSection";
 import { BODY_LIMITS, rangeErrorMessage } from "@/lib/ai/limits";
 import { addBodyMetric } from "@/lib/db/bodyMetrics";
 import type { Gender, Goal } from "@/lib/db/types";
@@ -184,6 +185,11 @@ export default function OnboardingPage() {
                 </div>
                 <p className={styles.fieldHint}>키·몸무게는 필수, 체지방률·골격근량은 선택이에요.</p>
             </section>
+
+            <InstallSection
+                title="앱으로 설치"
+                description="홈 화면에 추가하면 앱처럼 빠르게 실행할 수 있어요. (나중에 설정 탭에서도 가능)"
+            />
 
             <div className={styles.footer}>
                 <button

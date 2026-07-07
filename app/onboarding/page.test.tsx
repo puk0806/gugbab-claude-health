@@ -17,6 +17,14 @@ vi.mock("@/lib/db/bodyMetrics", () => ({
     addBodyMetric: vi.fn().mockResolvedValue({}),
 }));
 
+vi.mock("@/components/install/useInstallPrompt", () => ({
+    useInstallPrompt: vi.fn().mockReturnValue({
+        mode: "native",
+        canInstall: true,
+        promptInstall: vi.fn(),
+    }),
+}));
+
 function fillRequired() {
     fireEvent.click(screen.getByRole("button", { name: "여성" }));
     fireEvent.click(screen.getByRole("button", { name: "건강 유지" }));
@@ -45,6 +53,13 @@ describe("OnboardingPage", () => {
         expect(screen.getByLabelText("몸무게 (kg)")).toBeInTheDocument();
         expect(screen.getByLabelText("체지방률 (%)")).toBeInTheDocument();
         expect(screen.getByLabelText("골격근량 (kg)")).toBeInTheDocument();
+    });
+
+    it("설치 가능 환경이면 앱 설치 안내 섹션을 표시한다", () => {
+        render(<OnboardingPage />);
+        expect(screen.getByText("앱으로 설치")).toBeInTheDocument();
+        expect(screen.getByText(/홈 화면에 추가하면 앱처럼/)).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "앱 설치" })).toBeInTheDocument();
     });
 
     it("renders male and female buttons", () => {

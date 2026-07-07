@@ -85,6 +85,7 @@ export default function BodyPage() {
                                 id="weight"
                                 className={styles.input}
                                 type="number"
+                                inputMode="decimal"
                                 placeholder="예: 70"
                                 min={BODY_LIMITS.weightKg.min}
                                 max={BODY_LIMITS.weightKg.max}
@@ -103,6 +104,7 @@ export default function BodyPage() {
                                 id="body-fat"
                                 className={styles.input}
                                 type="number"
+                                inputMode="decimal"
                                 placeholder="선택"
                                 min={BODY_LIMITS.bodyFatPct.min}
                                 max={BODY_LIMITS.bodyFatPct.max}
@@ -121,6 +123,7 @@ export default function BodyPage() {
                                 id="muscle-mass"
                                 className={styles.input}
                                 type="number"
+                                inputMode="decimal"
                                 placeholder="선택"
                                 min={BODY_LIMITS.skeletalMuscleKg.min}
                                 max={BODY_LIMITS.skeletalMuscleKg.max}

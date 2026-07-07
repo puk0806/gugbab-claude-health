@@ -112,8 +112,16 @@ export default function ChatInputBar({
         <>
             {(interimText || micError) && (
                 <div className={styles.micHint}>
-                    {interimText && <span className={styles.interim}>{interimText}</span>}
-                    {micError && <span className={styles.micError}>{micError}</span>}
+                    {interimText && (
+                        <span className={styles.interim} aria-live="polite">
+                            {interimText}
+                        </span>
+                    )}
+                    {micError && (
+                        <span className={styles.micError} role="alert">
+                            {micError}
+                        </span>
+                    )}
                 </div>
             )}
             <div className={styles.inputBar}>

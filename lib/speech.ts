@@ -12,7 +12,8 @@ interface SpeechRecognitionResultList {
 
 interface SpeechRecognitionEvent extends Event {
     readonly results: SpeechRecognitionResultList;
-    readonly resultIndex: number;
+    /** 표준 속성이지만 일부 WebKit 구현이 누락 — 방어적으로 optional 취급 */
+    readonly resultIndex?: number;
 }
 
 interface SpeechRecognitionErrorEvent extends Event {
@@ -61,12 +62,20 @@ export function createRecognizer(
     rec.continuous = false;
     rec.interimResults = true;
 
+    // resultIndex 없는 비표준 구현용 진행 커서 — 이미 확정(final) 처리한 앞부분을 다시 재생하지 않기 위한 위치
+    let nextUnprocessedIndex = 0;
     rec.onresult = (event) => {
-        // 한 이벤트에 여러 결과가 배치될 수 있다(final + 새 interim) — resultIndex부터 전부 전달해 final 유실 방지
-        for (let i = event.resultIndex; i < event.results.length; i++) {
+        // 한 이벤트에 여러 결과가 배치될 수 있다(final + 새 interim) — resultIndex부터 전부 전달해 final 유실 방지.
+        // resultIndex가 없으면 커서부터 순회: 누적 리스트의 이전 final 중복 재생과 배치 유실을 동시에 방지.
+        // (리스트가 이벤트마다 초기화되는 구현도 있어 커서는 마지막 인덱스로 클램프)
+        const start = event.resultIndex ?? Math.min(nextUnprocessedIndex, event.results.length - 1);
+        for (let i = start; i < event.results.length; i++) {
             const result = event.results[i];
             onResult(result[0].transcript, result.isFinal);
         }
+        let finals = 0;
+        while (finals < event.results.length && event.results[finals].isFinal) finals++;
+        nextUnprocessedIndex = finals;
     };
     rec.onend = onEnd;
     rec.onerror = (event) => {

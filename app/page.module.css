@@ -144,3 +144,14 @@
   color: var(--gugbab-color-fg-disabled);
   cursor: default;
 }
+
+.listBtn {
+  padding: 4px 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 1rem;
+  color: var(--gugbab-color-fg-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+}

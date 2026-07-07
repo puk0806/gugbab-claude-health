@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import BottomNav from "@/components/layout/BottomNav";
-import { addBodyMetric, getLatestBodyMetrics } from "@/lib/db/bodyMetrics";
+import { BODY_LIMITS, rangeErrorMessage } from "@/lib/ai/limits";
+import { addBodyMetric, deleteBodyMetric, getLatestBodyMetrics } from "@/lib/db/bodyMetrics";
 import { getLocalDateString } from "@/lib/db/index";
 import type { BodyMetric } from "@/lib/db/types";
 import styles from "./page.module.css";
@@ -27,13 +28,31 @@ export default function BodyPage() {
             .finally(() => setLoadingRecords(false));
     }, []);
 
+    const weightError = rangeErrorMessage(weight, BODY_LIMITS.weightKg);
+    const bodyFatError = rangeErrorMessage(bodyFat, BODY_LIMITS.bodyFatPct);
+    const muscleError = rangeErrorMessage(muscleMass, BODY_LIMITS.skeletalMuscleKg);
+    const hasError = weightError !== "" || bodyFatError !== "" || muscleError !== "";
+
+    async function handleDelete(id: string) {
+        try {
+            await deleteBodyMetric(id);
+        } catch {
+            return;
+        }
+        // 로컬 필터 대신 재조회 — 7개 초과 보유 시 다음 오래된 기록이 목록을 채우도록
+        const fresh = await getLatestBodyMetrics(7).catch(() => null);
+        if (fresh) {
+            setRecords(fresh);
+        } else {
+            setRecords((prev) => prev.filter((r) => r.id !== id));
+        }
+    }
+
     async function handleSave() {
-        const w = Number.parseFloat(weight);
-        if (Number.isNaN(w) || w < 20 || w > 300) return;
-        const bf = bodyFat ? Number.parseFloat(bodyFat) : undefined;
-        const mm = muscleMass ? Number.parseFloat(muscleMass) : undefined;
-        if (bf !== undefined && (Number.isNaN(bf) || bf < 1 || bf > 70)) return;
-        if (mm !== undefined && (Number.isNaN(mm) || mm < 1 || mm > 100)) return;
+        if (!weight.trim() || hasError) return;
+        const w = Number(weight);
+        const bf = bodyFat.trim() ? Number(bodyFat) : undefined;
+        const mm = muscleMass.trim() ? Number(muscleMass) : undefined;
         setSaving(true);
         try {
             const metric = await addBodyMetric({
@@ -59,50 +78,67 @@ export default function BodyPage() {
             <section className={styles.formSection}>
                 <h2 className={styles.sectionTitle}>오늘 기록 — {getLocalDateString()}</h2>
                 <div className={styles.inputRow}>
-                    <label className={styles.label} htmlFor="weight">
-                        체중 (kg)
-                        <input
-                            id="weight"
-                            className={styles.input}
-                            type="number"
-                            placeholder="예: 70"
-                            min="20"
-                            max="300"
-                            step="0.1"
-                            value={weight}
-                            onChange={(e) => setWeight(e.target.value)}
-                        />
-                    </label>
-                    <label className={styles.label} htmlFor="body-fat">
-                        체지방률 (%)
-                        <input
-                            id="body-fat"
-                            className={styles.input}
-                            type="number"
-                            placeholder="선택"
-                            min="1"
-                            max="70"
-                            step="0.1"
-                            value={bodyFat}
-                            onChange={(e) => setBodyFat(e.target.value)}
-                        />
-                    </label>
-                    <label className={styles.label} htmlFor="muscle-mass">
-                        골격근량 (kg)
-                        <input
-                            id="muscle-mass"
-                            className={styles.input}
-                            type="number"
-                            placeholder="선택"
-                            min="1"
-                            max="100"
-                            step="0.1"
-                            value={muscleMass}
-                            onChange={(e) => setMuscleMass(e.target.value)}
-                        />
-                    </label>
+                    <div className={styles.fieldGroup}>
+                        <label className={styles.label} htmlFor="weight">
+                            체중 (kg)
+                            <input
+                                id="weight"
+                                className={styles.input}
+                                type="number"
+                                placeholder="예: 70"
+                                min={BODY_LIMITS.weightKg.min}
+                                max={BODY_LIMITS.weightKg.max}
+                                step="0.1"
+                                value={weight}
+                                onChange={(e) => setWeight(e.target.value)}
+                                aria-invalid={weightError !== ""}
+                            />
+                        </label>
+                        {weightError && <span className={styles.fieldError}>{weightError}</span>}
+                    </div>
+                    <div className={styles.fieldGroup}>
+                        <label className={styles.label} htmlFor="body-fat">
+                            체지방률 (%)
+                            <input
+                                id="body-fat"
+                                className={styles.input}
+                                type="number"
+                                placeholder="선택"
+                                min={BODY_LIMITS.bodyFatPct.min}
+                                max={BODY_LIMITS.bodyFatPct.max}
+                                step="0.1"
+                                value={bodyFat}
+                                onChange={(e) => setBodyFat(e.target.value)}
+                                aria-invalid={bodyFatError !== ""}
+                            />
+                        </label>
+                        {bodyFatError && <span className={styles.fieldError}>{bodyFatError}</span>}
+                    </div>
+                    <div className={styles.fieldGroup}>
+                        <label className={styles.label} htmlFor="muscle-mass">
+                            골격근량 (kg)
+                            <input
+                                id="muscle-mass"
+                                className={styles.input}
+                                type="number"
+                                placeholder="선택"
+                                min={BODY_LIMITS.skeletalMuscleKg.min}
+                                max={BODY_LIMITS.skeletalMuscleKg.max}
+                                step="0.1"
+                                value={muscleMass}
+                                onChange={(e) => setMuscleMass(e.target.value)}
+                                aria-invalid={muscleError !== ""}
+                            />
+                        </label>
+                        {muscleError && <span className={styles.fieldError}>{muscleError}</span>}
+                    </div>
                 </div>
-                <button type="button" className={styles.saveBtn} onClick={handleSave} disabled={!weight || saving}>
+                <button
+                    type="button"
+                    className={styles.saveBtn}
+                    onClick={handleSave}
+                    disabled={!weight || hasError || saving}
+                >
                     {saving ? "저장 중..." : "저장"}
                 </button>
             </section>
@@ -123,6 +159,14 @@ export default function BodyPage() {
                                 {r.skeletalMuscleMass !== undefined && (
                                     <span className={styles.recordSub}>골격근 {r.skeletalMuscleMass} kg</span>
                                 )}
+                                <button
+                                    type="button"
+                                    className={styles.recordDeleteBtn}
+                                    onClick={() => handleDelete(r.id)}
+                                    aria-label={`${r.date} 기록 삭제`}
+                                >
+                                    🗑
+                                </button>
                             </li>
                         ))}
                     </ul>

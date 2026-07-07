@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { InstallButton } from "@/components/install/InstallButton";
 import BottomNav from "@/components/layout/BottomNav";
-import { BODY_LIMITS, isInRange, type NumberRange } from "@/lib/ai/limits";
+import { BODY_LIMITS, isInRange, rangeErrorMessage } from "@/lib/ai/limits";
 import type { Gender, Goal, UserProfile } from "@/lib/db/types";
 import { getUserProfile, saveUserProfile } from "@/lib/db/userProfile";
 import styles from "./page.module.css";
@@ -17,14 +17,6 @@ const GOAL_LABELS: Record<Goal, string> = {
 };
 
 const GOALS = Object.entries(GOAL_LABELS) as [Goal, string][];
-
-// 범위는 /api/chat 스키마와 BODY_LIMITS 상수로 공유 — 저장은 되는데 채팅이 400 나는 함정 방지
-function rangeErrorMessage(value: string, range: NumberRange): string {
-    if (value.trim() === "") return "";
-    const n = Number(value);
-    if (!isInRange(n, range)) return `${range.min}~${range.max} 사이 숫자로 입력해주세요`;
-    return "";
-}
 
 function parseValidated(value: string): number | undefined {
     return value.trim() === "" ? undefined : Number(value);

@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { BODY_LIMITS, rangeErrorMessage } from "@/lib/ai/limits";
+import { addBodyMetric } from "@/lib/db/bodyMetrics";
 import type { Gender, Goal } from "@/lib/db/types";
 import { saveUserProfile } from "@/lib/db/userProfile";
 import styles from "./page.module.css";
@@ -18,17 +20,41 @@ export default function OnboardingPage() {
     const router = useRouter();
     const [gender, setGender] = useState<Gender | null>(null);
     const [goals, setGoals] = useState<Goal[]>([]);
+    const [height, setHeight] = useState("");
+    const [weight, setWeight] = useState("");
+    const [bodyFat, setBodyFat] = useState("");
+    const [muscleMass, setMuscleMass] = useState("");
     const [saving, setSaving] = useState(false);
+
+    const heightError = rangeErrorMessage(height, BODY_LIMITS.heightCm);
+    const weightError = rangeErrorMessage(weight, BODY_LIMITS.weightKg);
+    const bodyFatError = rangeErrorMessage(bodyFat, BODY_LIMITS.bodyFatPct);
+    const muscleError = rangeErrorMessage(muscleMass, BODY_LIMITS.skeletalMuscleKg);
+    const hasError = [heightError, weightError, bodyFatError, muscleError].some((e) => e !== "");
+    // 키·몸무게는 필수, 체지방률·골격근량은 선택
+    const requiredFilled =
+        gender !== null && goals.length > 0 && height.trim() !== "" && weight.trim() !== "";
 
     function toggleGoal(goal: Goal) {
         setGoals((prev) => (prev.includes(goal) ? prev.filter((g) => g !== goal) : [...prev, goal]));
     }
 
     async function handleSave() {
-        if (!gender || goals.length === 0) return;
+        if (!gender || !requiredFilled || hasError) return;
         setSaving(true);
         try {
-            await saveUserProfile({ gender, goals });
+            await saveUserProfile({
+                gender,
+                goals,
+                heightCm: Number(height),
+                weightKg: Number(weight),
+            });
+            // 입력받은 신체 수치를 첫 지표 기록으로 남긴다 — 실패해도 온보딩은 계속
+            await addBodyMetric({
+                weight: Number(weight),
+                ...(bodyFat.trim() ? { bodyFatPct: Number(bodyFat) } : {}),
+                ...(muscleMass.trim() ? { skeletalMuscleMass: Number(muscleMass) } : {}),
+            }).catch(() => undefined);
             router.push("/");
         } finally {
             setSaving(false);
@@ -74,12 +100,97 @@ export default function OnboardingPage() {
                 </div>
             </section>
 
+            <section className={styles.section}>
+                <h2 className={styles.sectionTitle}>신체 정보</h2>
+                <div className={styles.fieldRow}>
+                    <div className={styles.fieldGroup}>
+                        <label className={styles.fieldLabel} htmlFor="onboarding-height">
+                            키 (cm)
+                            <input
+                                id="onboarding-height"
+                                type="number"
+                                inputMode="decimal"
+                                min={BODY_LIMITS.heightCm.min}
+                                max={BODY_LIMITS.heightCm.max}
+                                step="0.1"
+                                className={styles.fieldInput}
+                                value={height}
+                                onChange={(e) => setHeight(e.target.value)}
+                                placeholder="예: 175"
+                                aria-invalid={heightError !== ""}
+                            />
+                        </label>
+                        {heightError && <span className={styles.fieldError}>{heightError}</span>}
+                    </div>
+                    <div className={styles.fieldGroup}>
+                        <label className={styles.fieldLabel} htmlFor="onboarding-weight">
+                            몸무게 (kg)
+                            <input
+                                id="onboarding-weight"
+                                type="number"
+                                inputMode="decimal"
+                                min={BODY_LIMITS.weightKg.min}
+                                max={BODY_LIMITS.weightKg.max}
+                                step="0.1"
+                                className={styles.fieldInput}
+                                value={weight}
+                                onChange={(e) => setWeight(e.target.value)}
+                                placeholder="예: 70"
+                                aria-invalid={weightError !== ""}
+                            />
+                        </label>
+                        {weightError && <span className={styles.fieldError}>{weightError}</span>}
+                    </div>
+                </div>
+                <div className={styles.fieldRow}>
+                    <div className={styles.fieldGroup}>
+                        <label className={styles.fieldLabel} htmlFor="onboarding-body-fat">
+                            체지방률 (%)
+                            <input
+                                id="onboarding-body-fat"
+                                type="number"
+                                inputMode="decimal"
+                                min={BODY_LIMITS.bodyFatPct.min}
+                                max={BODY_LIMITS.bodyFatPct.max}
+                                step="0.1"
+                                className={styles.fieldInput}
+                                value={bodyFat}
+                                onChange={(e) => setBodyFat(e.target.value)}
+                                placeholder="선택"
+                                aria-invalid={bodyFatError !== ""}
+                            />
+                        </label>
+                        {bodyFatError && <span className={styles.fieldError}>{bodyFatError}</span>}
+                    </div>
+                    <div className={styles.fieldGroup}>
+                        <label className={styles.fieldLabel} htmlFor="onboarding-muscle">
+                            골격근량 (kg)
+                            <input
+                                id="onboarding-muscle"
+                                type="number"
+                                inputMode="decimal"
+                                min={BODY_LIMITS.skeletalMuscleKg.min}
+                                max={BODY_LIMITS.skeletalMuscleKg.max}
+                                step="0.1"
+                                className={styles.fieldInput}
+                                value={muscleMass}
+                                onChange={(e) => setMuscleMass(e.target.value)}
+                                placeholder="선택"
+                                aria-invalid={muscleError !== ""}
+                            />
+                        </label>
+                        {muscleError && <span className={styles.fieldError}>{muscleError}</span>}
+                    </div>
+                </div>
+                <p className={styles.fieldHint}>키·몸무게는 필수, 체지방률·골격근량은 선택이에요.</p>
+            </section>
+
             <div className={styles.footer}>
                 <button
                     type="button"
                     className={styles.saveBtn}
                     onClick={handleSave}
-                    disabled={gender === null || goals.length === 0 || saving}
+                    disabled={!requiredFilled || hasError || saving}
                 >
                     {saving ? "저장 중..." : "시작하기"}
                 </button>

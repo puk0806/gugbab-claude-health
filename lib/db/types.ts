@@ -35,7 +35,19 @@ export interface ChatMessage {
     content: string;
 }
 
-export interface MealHistory {
+export type MealPlanMode = "pantry-only" | "free";
+
+export interface Conversation {
+    id: string;
+    title: string;
+    messages: ChatMessage[];
+    mealPlanMode?: MealPlanMode;
+    createdAt: string;
+    updatedAt: string;
+}
+
+/** v1 mealHistory 스토어 레코드 — v2 마이그레이션 전용 */
+export interface LegacyMealHistory {
     id: string;
     date: string;
     messages: ChatMessage[];

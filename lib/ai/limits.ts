@@ -3,6 +3,8 @@
 export const BODY_LIMITS = {
     heightCm: { min: 50, max: 300 },
     weightKg: { min: 10, max: 500 },
+    bodyFatPct: { min: 1, max: 70 },
+    skeletalMuscleKg: { min: 1, max: 100 },
 } as const;
 
 export interface NumberRange {
@@ -12,4 +14,12 @@ export interface NumberRange {
 
 export function isInRange(value: number, range: NumberRange): boolean {
     return Number.isFinite(value) && value >= range.min && value <= range.max;
+}
+
+/** 입력 문자열의 범위 검증 에러 문구 — 빈 값은 에러 아님(선택 입력 허용) */
+export function rangeErrorMessage(value: string, range: NumberRange): string {
+    if (value.trim() === "") return "";
+    const n = Number(value);
+    if (!isInRange(n, range)) return `${range.min}~${range.max} 사이 숫자로 입력해주세요`;
+    return "";
 }

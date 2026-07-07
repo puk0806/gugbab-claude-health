@@ -28,3 +28,8 @@ export async function addBodyMetric(data: {
     await db.put("bodyMetrics", metric);
     return metric;
 }
+
+export async function deleteBodyMetric(id: string): Promise<void> {
+    const db = await getDB();
+    await db.delete("bodyMetrics", id);
+}

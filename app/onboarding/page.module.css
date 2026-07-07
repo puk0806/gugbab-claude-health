@@ -90,3 +90,55 @@
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+.fieldRow {
+  display: flex;
+  gap: 12px;
+}
+
+.fieldRow + .fieldRow {
+  margin-top: 12px;
+}
+
+.fieldGroup {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.fieldLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--gugbab-color-fg-secondary);
+}
+
+.fieldInput {
+  padding: 10px 14px;
+  border: 1.5px solid var(--gugbab-color-border-subtle);
+  border-radius: 12px;
+  font-size: 0.9375rem;
+  background: transparent;
+  color: var(--gugbab-color-fg-primary);
+  outline: none;
+}
+
+.fieldInput:focus {
+  border-color: #22c55e;
+}
+
+.fieldError {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--gugbab-color-danger-base, #e5484d);
+}
+
+.fieldHint {
+  margin: 8px 0 0;
+  font-size: 0.75rem;
+  color: var(--gugbab-color-fg-muted);
+}

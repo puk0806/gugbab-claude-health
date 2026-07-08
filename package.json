@@ -41,6 +41,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.4.15",
     "@gugbab/biome-config": "1.0.1",
+    "@gugbab/relay-types": "latest",
     "@playwright/test": "1.60.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",

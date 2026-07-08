@@ -1,8 +1,9 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import type { ModelInfo } from "@/lib/ai/types";
 import ModelSheet from "./ModelSheet";
 
-const MODELS = [
+const MODELS: ModelInfo[] = [
     { id: "claude-sonnet-4-6", alias: "sonnet", name: "Claude Sonnet 4.6", description: "균형 (기본값)" },
     { id: "claude-fable-5", alias: "fable", name: "Claude Fable 5", description: "최상위 모델 — 비용 높음" },
 ];

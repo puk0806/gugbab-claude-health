@@ -1,6 +1,7 @@
+import type { ChatRequest, SSEError } from "@gugbab/relay-types";
+import { toSSELine } from "@gugbab/utils";
 import type { NextRequest } from "next/server";
 import { z } from "zod";
-import { toSSELine } from "@gugbab/utils";
 import { buildSystemPrompt } from "@/lib/ai/context";
 import { BODY_LIMITS } from "@/lib/ai/limits";
 
@@ -40,6 +41,9 @@ const ChatRequestSchema = z.object({
     model: z.string().min(1).max(64).optional(),
 });
 
+// model은 문자열 그대로 전달 — 값 유효성의 단일 소스는 relay이므로 alias union으로 좁히지 않는다
+type RelayChatBody = Omit<ChatRequest, "model"> & { model?: string };
+
 const SSE_HEADERS = {
     "content-type": "text/event-stream; charset=utf-8",
     "cache-control": "no-cache",
@@ -51,7 +55,8 @@ function sseErrorResponse(): Response {
     const encoder = new TextEncoder();
     const stream = new ReadableStream<Uint8Array>({
         start(controller) {
-            controller.enqueue(encoder.encode(toSSELine({ type: "error", message: "릴레이 서버 오류가 발생했어요" })));
+            const event: SSEError = { type: "error", message: "릴레이 서버 오류가 발생했어요" };
+            controller.enqueue(encoder.encode(toSSELine(event)));
             controller.close();
         },
     });
@@ -95,7 +100,7 @@ export async function POST(req: NextRequest): Promise<Response> {
                 systemPrompt,
                 messages: parsed.messages,
                 ...(parsed.model ? { model: parsed.model } : {}),
-            }),
+            } satisfies RelayChatBody),
             signal: req.signal,
         });
     } catch {

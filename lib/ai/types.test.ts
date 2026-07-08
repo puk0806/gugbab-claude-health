@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
-import type { ModelInfo, ModelsResponse } from "./types";
+import type { ModelAlias, ModelInfo, ModelsResponse } from "./types";
 
 describe("AI 타입 계약", () => {
     it("ModelsResponse가 relay GET /api/models 응답 형태와 일치", () => {
@@ -16,6 +16,6 @@ describe("AI 타입 계약", () => {
         };
         expect(sample.models[0].alias).toBe("sonnet");
         expectTypeOf(sample.models).items.toEqualTypeOf<ModelInfo>();
-        expectTypeOf(sample.default).toEqualTypeOf<string>();
+        expectTypeOf(sample.default).toEqualTypeOf<ModelAlias>();
     });
 });

@@ -6,7 +6,7 @@
 }
 
 .header {
-  padding: 20px 20px 12px;
+  padding: calc(20px + env(safe-area-inset-top)) 20px 12px;
 }
 
 .title {
@@ -110,7 +110,8 @@
   padding: 10px 14px;
   border: 1.5px solid var(--gugbab-color-border-subtle);
   border-radius: 12px;
-  font-size: 0.9375rem;
+  /* 16px 미만이면 iOS가 포커스 시 화면을 자동 확대함 */
+  font-size: 1rem;
   background: transparent;
   color: var(--gugbab-color-fg-primary);
   outline: none;

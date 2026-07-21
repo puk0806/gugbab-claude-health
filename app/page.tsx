@@ -1,14 +1,17 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
 import { useSSEChat } from "@gugbab/hooks";
 import { capitalize } from "@gugbab/utils";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
 import ChatInputBar from "@/components/chat/ChatInputBar";
 import ConversationListSheet from "@/components/chat/ConversationListSheet";
 import MealPlanModeBanner from "@/components/chat/MealPlanModeBanner";
 import ModelSheet from "@/components/chat/ModelSheet";
 import BottomNav from "@/components/layout/BottomNav";
+import { BODY_LIMITS, isInRange, type NumberRange } from "@/lib/ai/limits";
+import type { ModelInfo, ModelsResponse, UserContext } from "@/lib/ai/types";
+import { copyToClipboard } from "@/lib/clipboard";
 import { getLatestBodyMetrics } from "@/lib/db/bodyMetrics";
 import {
     deleteConversation,
@@ -20,8 +23,7 @@ import {
 import { getAllIngredients } from "@/lib/db/ingredients";
 import type { ChatMessage, Conversation, MealPlanMode } from "@/lib/db/types";
 import { getUserProfile } from "@/lib/db/userProfile";
-import { BODY_LIMITS, isInRange, type NumberRange } from "@/lib/ai/limits";
-import type { ModelInfo, ModelsResponse, UserContext } from "@/lib/ai/types";
+import { useLongPress } from "@/lib/hooks/useLongPress";
 import styles from "./page.module.css";
 
 const MODEL_STORAGE_KEY = "gugbab-health:model";
@@ -77,6 +79,10 @@ export default function ChatPage() {
     const [model, setModel] = useState<string>(loadStoredModel);
     const [sheetOpen, setSheetOpen] = useState(false);
     const [mealPlanMode, setMealPlanMode] = useState<MealPlanMode | null>(null);
+    // 롱프레스로 연 복사 메뉴 — null이면 닫힘. 대상 메시지 내용과 표시 좌표를 담는다
+    const [copyMenu, setCopyMenu] = useState<{ content: string; x: number; y: number } | null>(null);
+    const [toast, setToast] = useState<string | null>(null);
+    const bindLongPress = useLongPress();
     const bottomRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     // 전송 후 완료 시점에 확정할 메시지 목록 — null이면 대기 중인 응답 없음
@@ -198,8 +204,20 @@ export default function ChatPage() {
         bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages, text]);
 
-    const ingredientsScarce =
-        context !== null && context.ingredients.length < SCARCE_INGREDIENT_THRESHOLD;
+    // 토스트는 잠깐 보여주고 자동으로 사라진다
+    useEffect(() => {
+        if (!toast) return;
+        const timer = setTimeout(() => setToast(null), 1600);
+        return () => clearTimeout(timer);
+    }, [toast]);
+
+    async function handleCopy(content: string) {
+        setCopyMenu(null);
+        const ok = await copyToClipboard(content);
+        setToast(ok ? "복사됨" : "복사에 실패했어요");
+    }
+
+    const ingredientsScarce = context !== null && context.ingredients.length < SCARCE_INGREDIENT_THRESHOLD;
     // 식재료 부족 시 추천 방식 선택은 강제 — 대화방당 1회, 선택 전에는 전송 불가
     const needsModeChoice = ingredientsScarce && mealPlanMode === null;
 
@@ -211,8 +229,7 @@ export default function ChatPage() {
         pendingRef.current = nextMessages;
         setMessages(nextMessages);
         setInput("");
-        const contextWithMode: UserContext =
-            ingredientsScarce && mealPlanMode ? { ...context, mealPlanMode } : context;
+        const contextWithMode: UserContext = ingredientsScarce && mealPlanMode ? { ...context, mealPlanMode } : context;
         // 목록으로 검증된 경우에만 model 전달 — 미로드 시 relay 기본값에 위임 (폐기된 alias 전송 방지)
         send({ messages: nextMessages, context: contextWithMode, ...(models ? { model } : {}) });
     }
@@ -293,12 +310,7 @@ export default function ChatPage() {
         <main className={styles.main}>
             <header className={styles.header}>
                 <div className={styles.headerLeft}>
-                    <button
-                        type="button"
-                        className={styles.listBtn}
-                        onClick={handleOpenList}
-                        aria-label="대화 목록"
-                    >
+                    <button type="button" className={styles.listBtn} onClick={handleOpenList} aria-label="대화 목록">
                         ☰
                     </button>
                     <span className={styles.headerTitle}>식단 채팅</span>
@@ -331,13 +343,12 @@ export default function ChatPage() {
                     <div
                         key={i}
                         className={msg.role === "user" ? styles.userBubble : styles.assistantBubble}
+                        {...bindLongPress(({ x, y }) => setCopyMenu({ content: msg.content, x, y }))}
                     >
                         {msg.content}
                     </div>
                 ))}
-                {streaming && streamingText && (
-                    <div className={styles.assistantBubble}>{streamingText}</div>
-                )}
+                {streaming && streamingText && <div className={styles.assistantBubble}>{streamingText}</div>}
                 {streaming && !streamingText && (
                     <div className={styles.typing} role="status" aria-label="입력 중">
                         <span />
@@ -377,6 +388,39 @@ export default function ChatPage() {
                 sendBlocked={needsModeChoice}
                 inputRef={inputRef}
             />
+
+            {copyMenu && (
+                // biome-ignore lint/a11y/useKeyWithClickEvents: 백드롭 탭으로 닫기 (ESC·바깥 클릭, 복사 버튼 별도 제공)
+                <div
+                    className={styles.copyMenuBackdrop}
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) setCopyMenu(null);
+                    }}
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="복사 메뉴"
+                >
+                    <div
+                        className={styles.copyMenu}
+                        // 롱프레스 지점에 맞춰 위치 — 동적 좌표라 CSS로 표현 불가
+                        style={{ left: copyMenu.x, top: copyMenu.y }}
+                    >
+                        <button
+                            type="button"
+                            className={styles.copyMenuItem}
+                            onClick={() => handleCopy(copyMenu.content)}
+                        >
+                            복사
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {toast && (
+                <div className={styles.toast} role="status">
+                    {toast}
+                </div>
+            )}
 
             <BottomNav active="chat" />
         </main>

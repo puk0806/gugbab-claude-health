@@ -68,6 +68,10 @@
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
+  /* 롱프레스 시 OS 기본 텍스트 선택·복사 콜아웃 억제 (커스텀 복사 메뉴 사용) */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .assistantBubble {
@@ -80,6 +84,70 @@
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
+  /* 롱프레스 시 OS 기본 텍스트 선택·복사 콜아웃 억제 (커스텀 복사 메뉴 사용) */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.copyMenuBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+}
+
+.copyMenu {
+  position: fixed;
+  /* 롱프레스 지점 바로 위에 중앙 정렬로 띄운다 */
+  transform: translate(-50%, calc(-100% - 10px));
+  background: var(--gugbab-color-bg-surface, #fff);
+  border: 1px solid var(--gugbab-color-border-subtle, #e5e7eb);
+  border-radius: 12px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+  padding: 4px;
+  /* 화면 밖으로 넘치지 않도록 좌우 여백 확보 */
+  max-width: calc(100vw - 24px);
+}
+
+.copyMenuItem {
+  display: block;
+  padding: 8px 20px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--gugbab-color-fg-primary, #111827);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(88px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 60;
+  padding: 8px 16px;
+  border-radius: 100px;
+  background: rgba(17, 24, 39, 0.9);
+  color: #fff;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: toastIn 0.15s ease-out;
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }
 
 .typing {

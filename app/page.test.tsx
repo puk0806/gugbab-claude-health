@@ -1,7 +1,9 @@
+import type { UseSSEChatResult } from "@gugbab/hooks";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useRouter } from "next/navigation";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { UseSSEChatResult } from "@gugbab/hooks";
+import { copyToClipboard } from "@/lib/clipboard";
+import { getLatestBodyMetrics } from "@/lib/db/bodyMetrics";
 import {
     deleteConversation,
     getConversation,
@@ -10,7 +12,6 @@ import {
     saveConversation,
 } from "@/lib/db/conversations";
 import { getAllIngredients } from "@/lib/db/ingredients";
-import { getLatestBodyMetrics } from "@/lib/db/bodyMetrics";
 import type { Conversation } from "@/lib/db/types";
 import { getUserProfile } from "@/lib/db/userProfile";
 import ChatPage from "./page";
@@ -51,6 +52,10 @@ vi.mock("@/components/layout/BottomNav", () => ({
 
 vi.mock("@gugbab/hooks", () => ({
     useSSEChat: () => ({ ...sseState, send: sendMock, abort: abortMock }),
+}));
+
+vi.mock("@/lib/clipboard", () => ({
+    copyToClipboard: vi.fn(),
 }));
 
 const MOCK_PROFILE = {
@@ -126,6 +131,8 @@ describe("ChatPage", () => {
         sseState.text = "";
         sseState.status = "idle";
         window.localStorage.clear();
+        vi.mocked(copyToClipboard).mockReset();
+        vi.mocked(copyToClipboard).mockResolvedValue(true);
         mockFetch.mockReset();
         mockFetch.mockResolvedValue(
             new Response(JSON.stringify(MODELS_RESPONSE), {
@@ -144,27 +151,21 @@ describe("ChatPage", () => {
     it("프로필 있으면 입력창·전송 버튼 표시", async () => {
         vi.mocked(getUserProfile).mockResolvedValue(MOCK_PROFILE);
         render(<ChatPage />);
-        await waitFor(() =>
-            expect(screen.getByPlaceholderText("식단을 요청해보세요...")).toBeInTheDocument(),
-        );
+        await waitFor(() => expect(screen.getByPlaceholderText("식단을 요청해보세요...")).toBeInTheDocument());
         expect(screen.getByRole("button", { name: "전송" })).toBeInTheDocument();
     });
 
     it("BottomNav active=chat", async () => {
         vi.mocked(getUserProfile).mockResolvedValue(MOCK_PROFILE);
         render(<ChatPage />);
-        await waitFor(() =>
-            expect(screen.getByTestId("bottom-nav")).toHaveAttribute("data-active", "chat"),
-        );
+        await waitFor(() => expect(screen.getByTestId("bottom-nav")).toHaveAttribute("data-active", "chat"));
     });
 
     it("최근 대화방이 있으면 그 메시지를 이어서 표시한다", async () => {
         vi.mocked(getUserProfile).mockResolvedValue(MOCK_PROFILE);
         vi.mocked(getLatestConversation).mockResolvedValue(makeConversation());
         render(<ChatPage />);
-        await waitFor(() =>
-            expect(screen.getByText("닭가슴살로 뭐 해먹을까요?")).toBeInTheDocument(),
-        );
+        await waitFor(() => expect(screen.getByText("닭가슴살로 뭐 해먹을까요?")).toBeInTheDocument());
         expect(screen.getByText("닭가슴살 샐러드를 추천드려요.")).toBeInTheDocument();
     });
 
@@ -237,9 +238,7 @@ describe("ChatPage", () => {
             });
             fireEvent.click(screen.getByRole("button", { name: "전송" }));
 
-            await waitFor(() =>
-                expect(screen.getByText("연어 스테이크를 추천해요")).toBeInTheDocument(),
-            );
+            await waitFor(() => expect(screen.getByText("연어 스테이크를 추천해요")).toBeInTheDocument());
             expect(saveConversation).toHaveBeenCalledWith(
                 expect.objectContaining({
                     messages: [
@@ -319,15 +318,17 @@ describe("ChatPage", () => {
 
             fireEvent.click(screen.getByRole("button", { name: "대화 목록" }));
 
-            await waitFor(() =>
-                expect(screen.getByRole("dialog", { name: "대화 목록" })).toBeInTheDocument(),
-            );
+            await waitFor(() => expect(screen.getByRole("dialog", { name: "대화 목록" })).toBeInTheDocument());
             expect(screen.getByText("저녁 추천")).toBeInTheDocument();
         });
 
         it("목록에서 방 선택 시 그 방의 대화를 표시한다", async () => {
             vi.mocked(listConversations).mockResolvedValue([
-                makeConversation({ id: "conv-2", title: "저녁 추천", messages: [{ role: "user", content: "저녁 추천" }] }),
+                makeConversation({
+                    id: "conv-2",
+                    title: "저녁 추천",
+                    messages: [{ role: "user", content: "저녁 추천" }],
+                }),
             ]);
             await renderAndWaitInput();
 
@@ -340,9 +341,7 @@ describe("ChatPage", () => {
         });
 
         it("목록에서 방 삭제 시 deleteConversation 호출", async () => {
-            vi.mocked(listConversations).mockResolvedValue([
-                makeConversation({ id: "conv-2", title: "저녁 추천" }),
-            ]);
+            vi.mocked(listConversations).mockResolvedValue([makeConversation({ id: "conv-2", title: "저녁 추천" })]);
             await renderAndWaitInput();
 
             fireEvent.click(screen.getByRole("button", { name: "대화 목록" }));
@@ -355,7 +354,10 @@ describe("ChatPage", () => {
         it("방 전환 후 늦게 끝난 저장은 활성 방을 되돌리지 않는다", async () => {
             const saveControl: { resolve: ((c: Conversation) => void) | null } = { resolve: null };
             vi.mocked(saveConversation).mockImplementation(
-                () => new Promise<Conversation>((res) => { saveControl.resolve = res; }),
+                () =>
+                    new Promise<Conversation>((res) => {
+                        saveControl.resolve = res;
+                    }),
             );
             sendMock.mockImplementation(() => {
                 sseState.text = "저녁 답변";
@@ -386,7 +388,10 @@ describe("ChatPage", () => {
             vi.mocked(listConversations).mockResolvedValue([current]);
             const saveControl: { resolve: ((c: Conversation) => void) | null } = { resolve: null };
             vi.mocked(saveConversation).mockImplementation(
-                () => new Promise<Conversation>((res) => { saveControl.resolve = res; }),
+                () =>
+                    new Promise<Conversation>((res) => {
+                        saveControl.resolve = res;
+                    }),
             );
             sendMock.mockImplementation(() => {
                 sseState.text = "추가 답변";
@@ -448,9 +453,7 @@ describe("ChatPage", () => {
             await waitFor(() => screen.getByRole("dialog", { name: "대화 목록" }));
             fireEvent.click(screen.getByRole("button", { name: `${current.title} 삭제` }));
 
-            await waitFor(() =>
-                expect(screen.queryByText("닭가슴살 샐러드를 추천드려요.")).not.toBeInTheDocument(),
-            );
+            await waitFor(() => expect(screen.queryByText("닭가슴살 샐러드를 추천드려요.")).not.toBeInTheDocument());
             expect(screen.getByText(/안녕하세요! 오늘 어떤 식단을/)).toBeInTheDocument();
         });
     });
@@ -504,9 +507,7 @@ describe("ChatPage", () => {
         });
 
         it("모드가 저장된 대화방에서는 다시 묻지 않는다", async () => {
-            vi.mocked(getLatestConversation).mockResolvedValue(
-                makeConversation({ mealPlanMode: "free" }),
-            );
+            vi.mocked(getLatestConversation).mockResolvedValue(makeConversation({ mealPlanMode: "free" }));
             await renderAndWaitInput();
 
             expect(screen.queryByText(/어떻게 추천해드릴까요/)).not.toBeInTheDocument();
@@ -518,9 +519,7 @@ describe("ChatPage", () => {
         });
 
         it("모드 선택 시 저장된 방이면 즉시 영속화한다", async () => {
-            vi.mocked(getLatestConversation).mockResolvedValue(
-                makeConversation({ mealPlanMode: undefined }),
-            );
+            vi.mocked(getLatestConversation).mockResolvedValue(makeConversation({ mealPlanMode: undefined }));
             await renderAndWaitInput();
             fireEvent.click(screen.getByRole("button", { name: "보유 재료로만" }));
 
@@ -584,6 +583,63 @@ describe("ChatPage", () => {
             };
             expect(body.context.heightCm).toBeUndefined();
             expect(body.context.weightKg).toBe(78);
+        });
+    });
+
+    describe("메시지 복사", () => {
+        beforeEach(() => {
+            vi.mocked(getUserProfile).mockResolvedValue(MOCK_PROFILE);
+            vi.mocked(getAllIngredients).mockResolvedValue(PLENTIFUL_INGREDIENTS);
+            vi.mocked(getLatestConversation).mockResolvedValue(makeConversation());
+        });
+
+        it("말풍선을 롱프레스하면 복사 메뉴가 뜬다", async () => {
+            render(<ChatPage />);
+            const bubble = await screen.findByText("닭가슴살 샐러드를 추천드려요.");
+            fireEvent.contextMenu(bubble);
+
+            expect(screen.getByRole("button", { name: "복사" })).toBeInTheDocument();
+        });
+
+        it("복사 버튼 클릭 시 메시지 내용을 복사하고 '복사됨'을 표시한다", async () => {
+            render(<ChatPage />);
+            const bubble = await screen.findByText("닭가슴살 샐러드를 추천드려요.");
+            fireEvent.contextMenu(bubble);
+            fireEvent.click(screen.getByRole("button", { name: "복사" }));
+
+            await waitFor(() => expect(copyToClipboard).toHaveBeenCalledWith("닭가슴살 샐러드를 추천드려요."));
+            await waitFor(() => expect(screen.getByText("복사됨")).toBeInTheDocument());
+            // 복사 후 메뉴는 닫힌다
+            expect(screen.queryByRole("button", { name: "복사" })).not.toBeInTheDocument();
+        });
+
+        it("사용자 말풍선도 복사할 수 있다", async () => {
+            render(<ChatPage />);
+            const bubble = await screen.findByText("닭가슴살로 뭐 해먹을까요?");
+            fireEvent.contextMenu(bubble);
+            fireEvent.click(screen.getByRole("button", { name: "복사" }));
+
+            await waitFor(() => expect(copyToClipboard).toHaveBeenCalledWith("닭가슴살로 뭐 해먹을까요?"));
+        });
+
+        it("복사 실패 시 실패 안내를 표시한다", async () => {
+            vi.mocked(copyToClipboard).mockResolvedValue(false);
+            render(<ChatPage />);
+            const bubble = await screen.findByText("닭가슴살 샐러드를 추천드려요.");
+            fireEvent.contextMenu(bubble);
+            fireEvent.click(screen.getByRole("button", { name: "복사" }));
+
+            await waitFor(() => expect(screen.getByText(/복사에 실패/)).toBeInTheDocument());
+        });
+
+        it("메뉴 바깥을 누르면 복사 메뉴가 닫힌다", async () => {
+            render(<ChatPage />);
+            const bubble = await screen.findByText("닭가슴살 샐러드를 추천드려요.");
+            fireEvent.contextMenu(bubble);
+            expect(screen.getByRole("button", { name: "복사" })).toBeInTheDocument();
+
+            fireEvent.click(screen.getByRole("dialog", { name: "복사 메뉴" }));
+            expect(screen.queryByRole("button", { name: "복사" })).not.toBeInTheDocument();
         });
     });
 });

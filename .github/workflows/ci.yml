@@ -1,0 +1,55 @@
+name: ci
+
+# 코드 품질 게이트 — main 규칙의 필수 검사 `ci`.
+# 시각 회귀는 visual-regression.yml 이 별도 필수 검사로 다룬다. 두 검사를 분리하는 이유:
+# accept-baseline 라벨은 visual-regression 성공을 직접 등록하므로, 같은 검사에 테스트를
+# 넣으면 라벨 하나로 테스트 실패까지 통과돼 버린다.
+#
+# 경로 필터를 두지 않는다 — 필수 검사는 모든 PR 에서 반드시 보고돼야 한다.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 22.13.1
+          cache: 'pnpm'
+
+      # lockfile 과 package.json 불일치를 잡는다(일반 install 은 조용히 갱신해 버린다)
+      - name: Install dependencies (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      # 린트·포맷·import 순서를 한 번에 — `biome lint` 보다 엄격하다
+      - name: Biome CI (lint + format + imports)
+        run: pnpm exec biome ci .
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Unit tests
+        run: pnpm test
+
+      # relay 연동 값은 런타임에만 읽으므로 빌드에 비밀값이 필요 없다
+      - name: Production build
+        run: pnpm build

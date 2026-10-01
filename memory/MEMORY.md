@@ -14,3 +14,5 @@
 - [이력 압축 크로스 리뷰](project-history-compression-cross-review.md) — health↔dream 장점 상호 이식 완료(2026-08-14), 양쪽 미커밋, dream 상세는 그쪽 memory 참조
 - [신체 지표·식재료 정책](project-body-metrics-ingredients.md) — 소수점은 반올림 아닌 **버림**(floor1), 골격근량 교차검증, 식재료 카테고리 폐지(DB v3)
 - [마이크 공통 패키지 이관](project-speech-package-migration.md) — lib/speech.ts 삭제→@gugbab/hooks useSpeechRecognition, page.test.tsx 훅 모킹 갱신 함정
+- [main 필수 검사 도입](project-ci-required-checks.md) — ci·visual-regression 필수화. **ci.yml 머지 전에 규칙 적용 금지**, biome ci 선행 정리 필수
+- [codex 리뷰 사용 불가](env-codex-model-unavailable.md) — gpt-5.4 모델 400으로 적대적 리뷰 전 경로 차단(2026-10-01), config.toml model 교체로 해소

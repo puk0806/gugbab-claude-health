@@ -31,6 +31,7 @@ permissions:
   contents: write
   pull-requests: write
   actions: read
+  checks: read
   statuses: write
 
 concurrency:
@@ -172,6 +173,47 @@ jobs:
           echo "pushed=true" >> $GITHUB_OUTPUT
           echo "target_sha=$NEW_SHA" >> $GITHUB_OUTPUT
           echo "→ baseline commit push 완료 (SHA=$NEW_SHA)"
+
+      # accept-baseline 커밋은 봇 push 라 ci 워크플로우가 돌지 않는다. ci 가 필수
+      # 검사이므로 그대로 두면 라벨을 붙여도 PR 이 영영 막힌다. 변경이 스크린샷뿐이고
+      # 직전 커밋 ci 가 성공일 때만 그 결과를 새 SHA 로 승계한다.
+      - name: Carry ci result to baseline commit
+        if: steps.mode.outputs.mode == 'accept' && steps.accept_commit.outputs.pushed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PREV_SHA: ${{ github.event.pull_request.head.sha }}
+          TARGET_SHA: ${{ steps.accept_commit.outputs.target_sha }}
+          RUN_ID: ${{ github.run_id }}
+          REPO: ${{ github.repository }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          set -euo pipefail
+          OUTSIDE=$(git diff --name-only "$PREV_SHA" "$TARGET_SHA" | grep -v '^e2e/visual/__screenshots__/' || true)
+          if [ -n "$OUTSIDE" ]; then
+            echo "::error::기준 이미지 커밋에 스크린샷 외 변경이 있어 ci 결과를 이어받지 않습니다:"
+            echo "$OUTSIDE"
+            exit 1
+          fi
+          ci_result() {
+            gh api "repos/${REPO}/commits/${PREV_SHA}/check-runs?check_name=ci" \
+              --jq '[.check_runs[] | select(.app.id == 15368)] | if length == 0 then "missing" elif any(.status != "completed") then "pending" elif any(.conclusion == "success") then "success" else "failure" end'
+          }
+          for _ in $(seq 1 60); do
+            RESULT=$(ci_result)
+            [ "$RESULT" = "pending" ] || [ "$RESULT" = "missing" ] || break
+            echo "직전 커밋 ci 결과 대기 중 ($RESULT)…"
+            sleep 20
+          done
+          if [ "$RESULT" != "success" ]; then
+            echo "::error::직전 커밋(${PREV_SHA})의 ci 가 성공이 아닙니다: ${RESULT}"
+            exit 1
+          fi
+          gh api -X POST "repos/${REPO}/statuses/${TARGET_SHA}" \
+            -f state=success \
+            -f context=ci \
+            -f description="스크린샷만 추가된 커밋 — 직전 커밋 ci 통과 승계" \
+            -f target_url="${SERVER}/${REPO}/actions/runs/${RUN_ID}" >/dev/null
+          echo "→ ci status 승계 완료 on ${TARGET_SHA} (from ${PREV_SHA})"
 
       # GITHUB_TOKEN push commit 은 워크플로우를 새로 트리거하지 못함 — required
       # status check 가 stuck 되지 않도록 새 SHA 에 status 를 직접 등록.

@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { IosInstallGuide } from "./IosInstallGuide";
 import styles from "./InstallButton.module.css";
-import { useInstallPrompt, type UseInstallPromptResult } from "./useInstallPrompt";
+import { IosInstallGuide } from "./IosInstallGuide";
+import { type UseInstallPromptResult, useInstallPrompt } from "./useInstallPrompt";
 
 interface InstallButtonProps {
     /** 부모(InstallSection)가 훅 상태를 공유할 때 주입 — 섹션·버튼의 설치 상태 불일치 방지 */

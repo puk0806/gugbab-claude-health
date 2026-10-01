@@ -7,7 +7,13 @@
  * addInitScript + 비동기 IDB는 useEffect와 경쟁 조건이 발생해 불안정.
  */
 import { expect, type Page, test } from "@playwright/test";
-import { SEED_BODY_METRICS, SEED_INGREDIENTS, SEED_MEAL_HISTORY, SEED_PROFILE, type SeedData } from "./_fixtures/init-script";
+import {
+    SEED_BODY_METRICS,
+    SEED_INGREDIENTS,
+    SEED_MEAL_HISTORY,
+    SEED_PROFILE,
+    type SeedData,
+} from "./_fixtures/init-script";
 
 /**
  * /onboarding으로 먼저 이동해 same-origin context를 확보한 뒤,

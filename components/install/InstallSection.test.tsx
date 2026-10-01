@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useInstallPrompt } from "./useInstallPrompt";
 import { InstallSection } from "./InstallSection";
+import { useInstallPrompt } from "./useInstallPrompt";
 
 vi.mock("./useInstallPrompt", () => ({
     useInstallPrompt: vi.fn(),
@@ -30,9 +30,7 @@ describe("InstallSection", () => {
             canInstall: false,
             promptInstall: vi.fn(),
         });
-        const { container } = render(
-            <InstallSection title="앱으로 설치" description="홈 화면에 추가하면 빨라요" />,
-        );
+        const { container } = render(<InstallSection title="앱으로 설치" description="홈 화면에 추가하면 빨라요" />);
         expect(container).toBeEmptyDOMElement();
     });
 });

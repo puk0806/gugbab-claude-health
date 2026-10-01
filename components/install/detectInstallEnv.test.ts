@@ -4,10 +4,8 @@ import { detectIOSSafari, detectStandalone } from "./detectInstallEnv";
 describe("detectStandalone", () => {
     it("returns false in SSR (no window)", () => {
         const original = global.window;
-        // biome-ignore lint/suspicious/noExplicitAny: test only
         (global as any).window = undefined;
         expect(detectStandalone()).toBe(false);
-        // biome-ignore lint/suspicious/noExplicitAny: test only
         (global as any).window = original;
     });
 
@@ -55,10 +53,8 @@ describe("detectIOSSafari", () => {
 
     it("returns false in SSR (no window)", () => {
         const original = global.window;
-        // biome-ignore lint/suspicious/noExplicitAny: test only
         (global as any).window = undefined;
         expect(detectIOSSafari()).toBe(false);
-        // biome-ignore lint/suspicious/noExplicitAny: test only
         (global as any).window = original;
     });
 

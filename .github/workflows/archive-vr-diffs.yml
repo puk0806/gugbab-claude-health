@@ -30,7 +30,7 @@ jobs:
     if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           ref: main
           fetch-depth: 1
@@ -51,30 +51,36 @@ jobs:
             echo "→ ${SNAPBRANCH} 없음, archive skip"
           fi
 
-      - name: Copy PNGs to main archive directory
+      # main 에 직접 push 하지 않는다 — main 은 PR 필수 규칙으로 보호되며,
+      # 진단용 PNG 가 제품 이력을 오염시킬 이유도 없다. 전용 vrt-archive 브랜치에 보관한다.
+      - name: Commit archive to vrt-archive branch
         if: steps.detect.outputs.exists == 'true'
         env:
+          HUSKY: '0'
           PR_NUMBER: ${{ github.event.pull_request.number }}
           BRANCH: ${{ steps.detect.outputs.branch }}
         run: |
-          ARCHIVE_DIR="e2e/visual/__diff_archive__/pr-${PR_NUMBER}"
-          mkdir -p "$ARCHIVE_DIR"
-          git archive --format=tar "origin/${BRANCH}" | tar -x -C "$ARCHIVE_DIR/"
-          echo "→ ${ARCHIVE_DIR} 에 복사 완료"
-          ls -R "$ARCHIVE_DIR" | head -50
-
-      - name: Commit and push archive to main
-        if: steps.detect.outputs.exists == 'true'
-        env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "e2e/visual/__diff_archive__/pr-${PR_NUMBER}"
-          if git diff --cached --quiet; then
-            echo "→ archive 할 변경 없음"
-            exit 0
+          set -euo pipefail
+          ARCHIVE_BRANCH=vrt-archive
+          WORKDIR=$(mktemp -d)
+          if git fetch origin "$ARCHIVE_BRANCH" 2>/dev/null; then
+            git worktree add -B "$ARCHIVE_BRANCH" "$WORKDIR" "origin/${ARCHIVE_BRANCH}"
+          else
+            git worktree add --orphan -B "$ARCHIVE_BRANCH" "$WORKDIR"
           fi
-          git commit -m "[ci] Add: archive PR #${PR_NUMBER} visual diff PNGs to main [skip ci]"
-          git push origin main
-          echo "→ main 에 archive commit push 완료"
+          (
+            cd "$WORKDIR"
+            mkdir -p "pr-${PR_NUMBER}"
+            git archive --format=tar "origin/${BRANCH}" | tar -x -C "pr-${PR_NUMBER}/"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add "pr-${PR_NUMBER}"
+            if git diff --cached --quiet; then
+              echo "→ archive 할 변경 없음"
+              exit 0
+            fi
+            git commit -m "[ci] Add: archive PR #${PR_NUMBER} visual diff PNGs"
+            git push origin "HEAD:refs/heads/${ARCHIVE_BRANCH}"
+            echo "→ ${ARCHIVE_BRANCH}/pr-${PR_NUMBER} 에 archive push 완료"
+          )
+          git worktree remove "$WORKDIR" --force

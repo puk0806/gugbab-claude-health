@@ -92,9 +92,7 @@ describe("SettingsPage", () => {
             fireEvent.click(screen.getByRole("button", { name: "저장" }));
 
             await waitFor(() =>
-                expect(saveUserProfile).toHaveBeenCalledWith(
-                    expect.objectContaining({ heightCm: 180, weightKg: 80 }),
-                ),
+                expect(saveUserProfile).toHaveBeenCalledWith(expect.objectContaining({ heightCm: 180, weightKg: 80 })),
             );
         });
 

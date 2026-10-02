@@ -31,6 +31,7 @@ permissions:
   contents: write
   pull-requests: write
   actions: read
+  checks: read
   statuses: write
 
 concurrency:
@@ -48,18 +49,26 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 2
-          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          # 이벤트 시점 커밋(SHA)을 빌드한다 — 라벨 부착 후 새로 push된 커밋이 끼어들지 않도록.
+          # 아래 push 단계는 브랜치가 그새 움직였으면 non-fast-forward 로 실패하므로 안전하다.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Detect mode
         id: mode
+        # 이벤트 필드는 run: 안의 ${{ }} 가 아니라 env 로 넘긴다 — 라벨 이름은
+        # 사용자가 정하는 텍스트다(현재는 job 레벨 if 가 막지만 영구 보장은 아니다).
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_ACTION: ${{ github.event.action }}
+          LABEL_NAME: ${{ github.event.label.name }}
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ] \
-              && [ "${{ github.event.action }}" = "labeled" ] \
-              && [ "${{ github.event.label.name }}" = "accept-baseline" ]; then
+          if [ "$EVENT_NAME" = "pull_request" ] \
+              && [ "$EVENT_ACTION" = "labeled" ] \
+              && [ "$LABEL_NAME" = "accept-baseline" ]; then
             echo "mode=accept" >> $GITHUB_OUTPUT
             echo "→ accept-baseline 라벨 감지 — baseline 갱신 모드"
           else
@@ -67,11 +76,11 @@ jobs:
             echo "→ 시각 회귀 비교 모드"
           fi
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
         with:
           version: 9.15.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22.13.1
           cache: 'pnpm'
@@ -132,6 +141,8 @@ jobs:
       - name: Commit accepted baseline to PR branch
         id: accept_commit
         if: steps.mode.outputs.mode == 'accept'
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -158,10 +169,51 @@ jobs:
           fi
           git commit -m "[ci] Modify: accepted baseline via accept-baseline label"
           NEW_SHA=$(git rev-parse HEAD)
-          git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          git push origin "HEAD:refs/heads/${HEAD_REF}"
           echo "pushed=true" >> $GITHUB_OUTPUT
           echo "target_sha=$NEW_SHA" >> $GITHUB_OUTPUT
           echo "→ baseline commit push 완료 (SHA=$NEW_SHA)"
+
+      # accept-baseline 커밋은 봇 push 라 ci 워크플로우가 돌지 않는다. ci 가 필수
+      # 검사이므로 그대로 두면 라벨을 붙여도 PR 이 영영 막힌다. 변경이 스크린샷뿐이고
+      # 직전 커밋 ci 가 성공일 때만 그 결과를 새 SHA 로 승계한다.
+      - name: Carry ci result to baseline commit
+        if: steps.mode.outputs.mode == 'accept' && steps.accept_commit.outputs.pushed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PREV_SHA: ${{ github.event.pull_request.head.sha }}
+          TARGET_SHA: ${{ steps.accept_commit.outputs.target_sha }}
+          RUN_ID: ${{ github.run_id }}
+          REPO: ${{ github.repository }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          set -euo pipefail
+          OUTSIDE=$(git diff --name-only "$PREV_SHA" "$TARGET_SHA" | grep -v '^e2e/visual/__screenshots__/' || true)
+          if [ -n "$OUTSIDE" ]; then
+            echo "::error::기준 이미지 커밋에 스크린샷 외 변경이 있어 ci 결과를 이어받지 않습니다:"
+            echo "$OUTSIDE"
+            exit 1
+          fi
+          ci_result() {
+            gh api "repos/${REPO}/commits/${PREV_SHA}/check-runs?check_name=ci" \
+              --jq '[.check_runs[] | select(.app.id == 15368)] | if length == 0 then "missing" elif any(.status != "completed") then "pending" elif any(.conclusion == "success") then "success" else "failure" end'
+          }
+          for _ in $(seq 1 60); do
+            RESULT=$(ci_result)
+            [ "$RESULT" = "pending" ] || [ "$RESULT" = "missing" ] || break
+            echo "직전 커밋 ci 결과 대기 중 ($RESULT)…"
+            sleep 20
+          done
+          if [ "$RESULT" != "success" ]; then
+            echo "::error::직전 커밋(${PREV_SHA})의 ci 가 성공이 아닙니다: ${RESULT}"
+            exit 1
+          fi
+          gh api -X POST "repos/${REPO}/statuses/${TARGET_SHA}" \
+            -f state=success \
+            -f context=ci \
+            -f description="스크린샷만 추가된 커밋 — 직전 커밋 ci 통과 승계" \
+            -f target_url="${SERVER}/${REPO}/actions/runs/${RUN_ID}" >/dev/null
+          echo "→ ci status 승계 완료 on ${TARGET_SHA} (from ${PREV_SHA})"
 
       # GITHUB_TOKEN push commit 은 워크플로우를 새로 트리거하지 못함 — required
       # status check 가 stuck 되지 않도록 새 SHA 에 status 를 직접 등록.
@@ -189,7 +241,7 @@ jobs:
 
       - name: Comment PR — baseline accepted
         if: steps.mode.outputs.mode == 'accept'
-        uses: thollander/actions-comment-pull-request@v3
+        uses: thollander/actions-comment-pull-request@24bffb9b452ba05a4f3f77933840a6a841d1b32b # v3.0.1
         with:
           message: |
             ## ✅ Baseline Accepted
@@ -304,7 +356,7 @@ jobs:
               echo "No snapshots to commit"
             else
               git commit -m "vrt: snapshots for PR #${PR_NUMBER} (run ${RUN_ID})"
-              git push -f origin "HEAD:${SNAPBRANCH}"
+              git push -f origin "HEAD:refs/heads/${SNAPBRANCH}"
               echo "→ Pushed to ${SNAPBRANCH}"
             fi
           )
@@ -389,7 +441,7 @@ jobs:
           steps.mode.outputs.mode == 'compare' &&
           github.event_name == 'pull_request' &&
           steps.collect.outputs.total_count != '0'
-        uses: thollander/actions-comment-pull-request@v3
+        uses: thollander/actions-comment-pull-request@24bffb9b452ba05a4f3f77933840a6a841d1b32b # v3.0.1
         with:
           message: ${{ steps.comment_body.outputs.body }}
           comment-tag: vrt-diff-images
@@ -401,7 +453,7 @@ jobs:
           steps.baseline.outputs.exists == 'true' &&
           steps.vr_compare.outcome == 'success' &&
           github.event_name == 'pull_request'
-        uses: thollander/actions-comment-pull-request@v3
+        uses: thollander/actions-comment-pull-request@24bffb9b452ba05a4f3f77933840a6a841d1b32b # v3.0.1
         with:
           message: |
             ## ✅ Visual Regression — 모든 시각 검사 통과
@@ -414,7 +466,7 @@ jobs:
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: playwright-report-${{ github.run_id }}
           path: playwright-report/
@@ -423,7 +475,7 @@ jobs:
 
       - name: Upload diff artifacts on failure
         if: steps.vr_compare.outcome == 'failure'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: vrt-test-results-${{ github.run_id }}
           path: test-results/

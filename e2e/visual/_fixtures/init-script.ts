@@ -65,7 +65,11 @@ export const SEED_MEAL_HISTORY: NonNullable<SeedData["mealHistory"]> = [
         date: todayLocalDate(),
         messages: [
             { role: "user", content: "닭가슴살이랑 계란 있는데 저녁 식단 추천해줘" },
-            { role: "assistant", content: "닭가슴살 브로콜리 스크램블 에그를 추천드려요! 단백질과 식이섬유가 풍부해 체중 감량에 효과적이에요." },
+            {
+                role: "assistant",
+                content:
+                    "닭가슴살 브로콜리 스크램블 에그를 추천드려요! 단백질과 식이섬유가 풍부해 체중 감량에 효과적이에요.",
+            },
         ],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),

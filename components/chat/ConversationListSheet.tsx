@@ -43,15 +43,8 @@ export default function ConversationListSheet({
                 ) : (
                     <ul className={styles.list}>
                         {conversations.map((c) => (
-                            <li
-                                key={c.id}
-                                className={c.id === activeId ? styles.rowActive : styles.row}
-                            >
-                                <button
-                                    type="button"
-                                    className={styles.rowMain}
-                                    onClick={() => onSelect(c)}
-                                >
+                            <li key={c.id} className={c.id === activeId ? styles.rowActive : styles.row}>
+                                <button type="button" className={styles.rowMain} onClick={() => onSelect(c)}>
                                     <span className={styles.rowTitle}>{c.title}</span>
                                     <span className={styles.rowDate}>{c.updatedAt.slice(0, 10)}</span>
                                 </button>

@@ -4,9 +4,7 @@ const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
 const MODELS_RESPONSE = {
-    models: [
-        { id: "claude-sonnet-4-6", alias: "sonnet", name: "Claude Sonnet 4.6", description: "속도·품질 균형" },
-    ],
+    models: [{ id: "claude-sonnet-4-6", alias: "sonnet", name: "Claude Sonnet 4.6", description: "속도·품질 균형" }],
     default: "sonnet",
 };
 

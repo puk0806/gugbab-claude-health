@@ -6,7 +6,8 @@ description: Vite 환경에서 PWA/Service Worker 설정 — vite-plugin-pwa, ge
 # Vite PWA / Service Worker
 
 > 소스: https://vite-pwa-org.netlify.app/guide/ | https://vite-pwa-org.netlify.app/workbox/ | https://github.com/vite-pwa/vite-plugin-pwa
-> 검증일: 2026-04-20
+> 검증일: 2026-09-28 (최초 작성 2026-04-20 · 08-11 버전 갱신 주의사항 추가 · 09-28 재검증: **대상 버전을 vite-plugin-pwa 1.3.0으로 확정**, 아래 본문 전체를 1.3.0 기준으로 정리)
+> 대상 버전: vite-plugin-pwa **1.3.0**(Vite 8 peer dependency 포함 — `peerDependencies.vite: "^3.1.0 || ^4.0.0 || ^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0"`, npm registry 확인). `VitePWA({...})` 옵션 구조(`registerType`, `strategies`, `workbox`, `manifest`, `srcDir`/`filename`, `devOptions`)는 최초 작성 시점(0.20.x)과 공식 문서 기준 동일하게 확인됨.
 
 ---
 
@@ -29,6 +30,7 @@ description: Vite 환경에서 PWA/Service Worker 설정 — vite-plugin-pwa, ge
 
 ```bash
 npm install -D vite-plugin-pwa workbox-precaching workbox-routing workbox-strategies
+# 2026-09-28 기준 vite-plugin-pwa 최신 안정 버전 = 1.3.0 (Vite 8 peer dependency 포함)
 ```
 
 ---

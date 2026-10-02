@@ -33,5 +33,6 @@ Next.js App Router (TypeScript) — gugbab health 건 앱
 | TypeScript 코딩 규칙 | @.claude/rules/typescript.md |
 | 에이전트 설계·작성 | @.claude/rules/agent-design.md |
 | 슬래시 커맨드 작성 | @.claude/rules/commands.md |
-| README 업데이트 | @.claude/rules/readme-update.md |
 | Codex 적대적 코드 리뷰 | @.claude/rules/codex-review.md |
+| 적대적 테스트 기준 | @.claude/rules/adversarial-testing.md |
+| 메모리 동기화·커밋 전 정리 | @.claude/rules/memory-sync.md |

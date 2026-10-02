@@ -1,10 +1,10 @@
 {
-  "defaultMode": "acceptEdits",
   "enabledPlugins": {
     "superpowers@superpowers-marketplace": true,
     "codex@openai-codex": true
   },
   "permissions": {
+    "defaultMode": "acceptEdits",
     "allow": [
       "Bash(node*)",
       "Bash(npx*)",
@@ -85,11 +85,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/bash-guard.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/bash-guard.js"
           },
           {
             "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/auto-approve.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/auto-approve.js"
           }
         ]
       },
@@ -98,15 +98,23 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/confirmation-gate.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/parry.js"
           },
           {
             "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/parry.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/protect-secrets.js"
           },
           {
             "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/protect-secrets.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/verification-guard.js"
+          },
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/skill-md-guard.js"
+          },
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/agent-md-guard.js"
           }
         ]
       },
@@ -115,11 +123,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/confirmation-gate.js"
-          },
-          {
-            "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/protect-secrets.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/protect-secrets.js"
           }
         ]
       },
@@ -128,11 +132,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/test-fake-guard.js"
-          },
-          {
-            "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/careful-with-judge.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/test-fake-guard.js"
           }
         ]
       },
@@ -141,7 +141,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/readme-guard.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/deliverable-guard.js"
           }
         ]
       },
@@ -150,7 +150,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/branch-protection.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/branch-protection.js"
           }
         ]
       }
@@ -161,31 +161,23 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/verification-guard.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/deliverable-guard.js"
           },
           {
             "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/skill-md-guard.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/adversarial-test-guard.js"
           },
           {
             "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/agent-md-guard.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/fake-impl-guard.js"
           },
           {
             "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/tdd-guard.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/typescript-quality.js --changed-only"
           },
           {
             "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/typescript-quality.js"
-          },
-          {
-            "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/session-summary.js"
-          },
-          {
-            "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/memory-sync.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/memory-sync.js"
           }
         ]
       },
@@ -194,19 +186,35 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/tdd-guard.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/deliverable-guard.js"
           },
           {
             "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/typescript-quality.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/verification-guard.js"
           },
           {
             "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/session-summary.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/skill-md-guard.js"
           },
           {
             "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/memory-sync.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/agent-md-guard.js"
+          },
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/adversarial-test-guard.js"
+          },
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/fake-impl-guard.js"
+          },
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/typescript-quality.js --changed-only"
+          },
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/memory-sync.js"
           }
         ]
       },
@@ -215,7 +223,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/bash-guard.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/bash-guard.js"
           }
         ]
       }
@@ -225,39 +233,19 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/memory-pull.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/memory-pull.js"
           },
           {
             "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/session-start.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-start.js"
           },
           {
             "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/session-handoff-inject.js"
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/task-plan-guard.js"
-          }
-        ]
-      }
-    ],
-    "InstructionsLoaded": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/instructions-loaded.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/instructions-loaded.js"
           },
           {
             "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/staleness-check.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/staleness-check.js --strict"
           }
         ]
       }
@@ -267,35 +255,19 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/pending-test-guard.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/deliverable-guard.js"
           },
           {
             "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/readme-guard.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/codex-review-guard.js"
           },
           {
             "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/codex-review-guard.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-export.js"
           },
           {
             "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/memory-stop-guard.js"
-          },
-          {
-            "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/verification-gate.js"
-          },
-          {
-            "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/session-summary.js"
-          },
-          {
-            "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/session-handoff.js"
-          },
-          {
-            "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/cc-notify.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/cc-notify.js"
           }
         ]
       }
@@ -306,11 +278,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/bash-guard.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/bash-guard.js"
           },
           {
             "type": "command",
-            "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/auto-approve.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/auto-approve.js"
           }
         ]
       }
@@ -318,6 +290,6 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "bash $CLAUDE_PROJECT_DIR/.claude/hooks/statusline.sh"
+    "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/statusline.sh"
   }
 }

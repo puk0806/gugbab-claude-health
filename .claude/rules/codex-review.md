@@ -1,5 +1,10 @@
 # Codex 적대적 코드 리뷰 워크플로우
 
+> **이 규칙은 `paths`로 스코핑하지 않는다.** `codex-review-guard` 훅이 Stop 시점에
+> 이 워크플로우를 평문 경로로 안내하므로(=`@` 임포트가 아님), 조건부 로딩으로 두면
+> 정작 리뷰가 필요한 순간에 규칙이 컨텍스트에 없다. 2026-08-11에 `.codex-review-done`
+> (리뷰 *완료 후* 생기는 마커)로 스코핑했다가 트리거가 역전되는 문제로 되돌렸다.
+
 ## 실행 조건 — 3가지 모두 충족해야 실행
 
 코딩 작업 완료 후 다음 순서로 확인한다:
@@ -8,8 +13,9 @@
 # 1. Codex CLI 설치 확인
 which codex >/dev/null 2>&1 || { echo "[codex-review] codex CLI 없음 — 건너뜀"; exit 0; }
 
-# 2. 로그인 상태 확인
-codex login status 2>&1 | grep -qi "logged in" || { echo "[codex-review] codex 미로그인 — 건너뜀"; exit 0; }
+# 2. 로그인 상태 확인 — 종료코드 0 AND "Not logged in" 문구 없음 (grep "logged in" 단독은 "Not logged in"에도 매치)
+CODEX_LOGIN=$(codex login status 2>&1) && ! printf '%s\n' "$CODEX_LOGIN" | grep -qi "not logged in" \
+  || { echo "[codex-review] codex 미로그인 — 건너뜀"; exit 0; }
 
 # 3. 프로젝트 플러그인 활성화 확인
 node -e "const s=require('./.claude/settings.json');process.exit(s.enabledPlugins?.['codex@openai-codex']?0:1)" 2>/dev/null \
@@ -46,16 +52,31 @@ node -e "const s=require('./.claude/settings.json');process.exit(s.enabledPlugin
 
 ## 워크플로우 (최대 3라운드)
 
-> **주의 (v0.122.0+)**: `codex review --uncommitted "[PROMPT]"` 구문은 지원되지 않는다.
-> 각 라운드는 `--uncommitted` 단독 실행 후 출력을 temp 파일에 저장해 재사용한다.
+> **리뷰 경로 (2026-07-21 정렬)**: 기본 `codex review`는 codex 내장 *일반* 리뷰 기준을 쓴다.
+> 진짜 적대적 기준(아래 attack-surface)을 쓰려면 플러그인의 **`adversarial-review` 컴패니언**을 태운다.
+> `codex review --uncommitted "[PROMPT]"` 병용은 v0.122.0+에서 미지원이므로, 커스텀 프롬프트 대신
+> 플러그인에 내장된 적대적 프롬프트(`prompts/adversarial-review.md`)를 사용한다.
+>
+> **각 라운드 공통 실행** (컴패니언 경로는 설치 버전에 무관하게 동적 해석):
+> ```bash
+> CODEX_COMPANION=$(ls ~/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs 2>/dev/null | sort -V | tail -1); \
+>   node "$CODEX_COMPANION" adversarial-review --wait --scope working-tree 2>&1 | tee /tmp/codex-rN.txt
+> ```
+> 컴패니언을 못 찾으면(플러그인 구조 변경 등) 폴백으로 `codex review --uncommitted`(기본 기준)를 쓴다.
+
+> **적대적 판정 기준 (codex `adversarial-review` 프롬프트 내장)** — codex가 이 축으로 결함을 찾는다:
+> - **스탠스**: 배포를 막을 가장 강한 이유를 찾는다. happy path에서만 동작하면 그 자체가 결함. 선의·부분 수정 크레딧 없음
+> - **공격 표면**: 인증·권한·테넌트 격리·신뢰 경계 / 데이터 손실·손상·비가역 상태 / 롤백·재시도·부분 실패·멱등성 / 레이스·순서 가정·재진입 / empty·null·timeout·의존성 degrade / 버전 skew·스키마 drift·마이그레이션 / 관측성 공백
+> - **finding 문턱**: 스타일·네이밍·저가치 클린업 제외, 근거 있는 material finding만
+> - **출력**: `needs-attention`(막을 위험) / `approve`(적대적 결함 0). 이 attack-surface는 `.claude/rules/adversarial-testing.md`(dev 템플릿 설치 시)의 테스트 기준과 동일 축으로 정렬됨
 
 ### Round 1 — 초기 적대적 리뷰
 
 ```bash
-codex review --uncommitted 2>&1 | tee /tmp/codex-r1.txt
+CODEX_COMPANION=$(ls ~/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs 2>/dev/null | sort -V | tail -1); node "$CODEX_COMPANION" adversarial-review --wait --scope working-tree 2>&1 | tee /tmp/codex-r1.txt
 ```
 
-Codex의 기본 리뷰어 관점: 모든 결함·보안취약점·성능 문제를 찾아낸다. Claude는 전체 출력(`/tmp/codex-r1.txt`)을 읽어 아래를 수행한다:
+Codex는 위 attack-surface 기준으로 결함·보안취약점·설계 약점을 찾는다. Claude는 전체 출력(`/tmp/codex-r1.txt`)을 읽어 아래를 수행한다:
 
 **Claude의 응답:**
 1. 각 지적을 분석하고 ACCEPT / REJECT / PARTIAL 판정
@@ -65,7 +86,7 @@ Codex의 기본 리뷰어 관점: 모든 결함·보안취약점·성능 문제�
 ### Round 2 — 수정 검증 + 추가 공격
 
 ```bash
-codex review --uncommitted 2>&1 | tee /tmp/codex-r2.txt
+CODEX_COMPANION=$(ls ~/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs 2>/dev/null | sort -V | tail -1); node "$CODEX_COMPANION" adversarial-review --wait --scope working-tree 2>&1 | tee /tmp/codex-r2.txt
 ```
 
 Round 1 수정 후 재실행. 전체 출력(`/tmp/codex-r2.txt`) 읽어 판정한다.
@@ -78,7 +99,7 @@ Round 1 수정 후 재실행. 전체 출력(`/tmp/codex-r2.txt`) 읽어 판정�
 ### Round 3 — 최종 검토 (마지막 기회)
 
 ```bash
-codex review --uncommitted 2>&1 | tee /tmp/codex-r3.txt
+CODEX_COMPANION=$(ls ~/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs 2>/dev/null | sort -V | tail -1); node "$CODEX_COMPANION" adversarial-review --wait --scope working-tree 2>&1 | tee /tmp/codex-r3.txt
 ```
 
 전체 출력(`/tmp/codex-r3.txt`) 읽어 최종 판정한다.
@@ -126,3 +147,38 @@ touch .claude/.codex-review-done
 
 이 마커가 있어야 `codex-review-guard` Stop 훅이 통과된다.
 훅에 의해 자동 트리거된 경우: 마커 기록 후 세션 종료를 재시도한다.
+
+---
+
+## 사용 불가 감지 시 마커 기록 (계정/모델 400 등 환경 오류)
+
+Round 실행 중 codex 응답이 **계정이 설정된 모델을 지원하지 않는다는 400 오류**
+(예: "The '...' model is not supported when using Codex with a ChatGPT account.")
+등 Claude 가 스스로 해소할 수 없는 환경 오류로 실패하면, "실행 조건 3가지"의 취지(조용히
+건너뜀)를 이 경우에도 적용한다 — 단, 매 턴 재시도해 사용자를 반복 차단하지 않도록 아래
+마커를 남긴다.
+
+1. 같은 사유로 **최소 2회** 재시도해 동일한 400/환경 오류임을 확인한다 (일시적 오류와 구분).
+2. 아래 명령으로 `.claude/.codex-unavailable` 에 감지 시각 + 현재 `~/.codex/config.toml`
+   해시 + `codex --version` 을 기록한다:
+
+```bash
+node -e '
+const fs=require("fs"),crypto=require("crypto"),os=require("os"),path=require("path"),{execSync}=require("child_process");
+const home=process.env.CODEX_HOME||path.join(os.homedir(),".codex");
+const cfg=path.join(home,"config.toml");
+let hash="MISSING"; try { hash=crypto.createHash("sha256").update(fs.readFileSync(cfg,"utf8")).digest("hex"); } catch {}
+const ver=execSync("codex --version",{encoding:"utf8"}).trim();
+fs.mkdirSync(".claude",{recursive:true});
+fs.writeFileSync(".claude/.codex-unavailable", JSON.stringify({detectedAt:new Date().toISOString(), configHash:hash, codexVersion:ver}, null, 2));
+'
+```
+
+3. 사용자에게 1회 보고한다: 어떤 모델/계정 조합이 거부되었는지, `~/.codex/config.toml`의
+   `model` 값을 무엇으로 바꾸면 해소 가능성이 있는지.
+4. `codex-review-guard` 훅은 이 마커의 `configHash`·`codexVersion`이 현재 상태와 **정확히
+   일치하는 동안에만** 차단 대신 세션당 1회 안내 후 통과시킨다. 사용자가 `config.toml`의
+   `model`을 바꾸거나 codex를 업데이트하면 마커가 자동 무효화되어 다음 Stop부터 리뷰가 다시
+   요구된다 — 마커를 수동으로 지울 필요는 없다.
+5. 마커 위조 방지를 위해 `.claude/.codex-unavailable`은 반드시 일반 파일로 기록한다(심볼릭
+   링크·다른 경로 참조 금지) — 훅이 심볼릭 링크는 무효로 간주한다.

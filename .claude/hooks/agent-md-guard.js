@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 /**
  * agent-md-guard.js
- * Claude Code PostToolUse Hook
+ * Claude Code PreToolUse (Write) + PostToolUse (Edit) Hook
  *
  * 목적: .claude/agents/{category}/{name}.md 저장 시 agent-design.md 규칙 구조 검증
+ *   PreToolUse Write — 사전 검증, 위반 시 저장 자체 차단 (exit 2)
+ *   PostToolUse Edit — 디스크 전체 재읽기 검증, 위반 시 수정 요구 (exit 2)
  *
  * 검증 항목:
  *   1. YAML frontmatter 존재 (--- 블록)
@@ -17,14 +19,26 @@
  */
 
 const readline = require('readline')
+const fs = require('fs')
 
+// CLAUDE.md(디렉토리 컨텍스트)·README.md는 에이전트 정의가 아니므로 제외
 const AGENT_MD_PATTERN = /\.claude\/agents\/.+\.md$/
+const NON_AGENT_BASENAMES = new Set(['CLAUDE.md', 'README.md'])
 
-// 유효한 model 값 (단축명 + 전체 ID)
+// 유효한 model 값 (단축명 + 전체 ID) — agent-design.md 모델 표와 동기화
+// 'fable' 별칭은 불허 — agent-design.md 규정상 frontmatter에는 전체 ID
+// claude-fable-5-1만 사용 (별칭 해석 미보장)
 const VALID_MODELS = new Set([
   'opus', 'sonnet', 'haiku',
-  'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5',
-  'claude-opus-4-7', 'claude-haiku-4-5-20251001',
+  // 현행 세대 — agent-design.md 모델 표에 문서화된 ID만 허용한다.
+  // (claude-mythos-5-1은 Project Glasswing 전용이고 이 레포 문서에 없어 제외)
+  'claude-fable-5-1',
+  'claude-opus-5-5', 'claude-sonnet-5',
+  'claude-haiku-4-5', 'claude-haiku-4-5-20251001',
+  // 아직 서비스되는 구세대 — 레거시 대응용으로 명시할 때만 허용
+  'claude-fable-5', 'claude-opus-5',
+  'claude-opus-4-6', 'claude-opus-4-7', 'claude-opus-4-8',
+  'claude-sonnet-4-6',
 ])
 
 function validate(content) {
@@ -53,7 +67,7 @@ function validate(content) {
   if (!/^tools\s*:/m.test(fm)) {
     errors.push(
       'frontmatter에 tools: 필드가 없습니다.\n' +
-      '  → 필요한 도구만 최소로 명시하세요. (agent-design.md 원칙 참조)'
+      '  → 필요한 도구만 최소로 명시하세요. (agent-design.md 원칙 참조 — 설치된 경우)'
     )
   }
 
@@ -100,29 +114,40 @@ async function main() {
   const { hook_event_name, hookEventName, tool_name, tool_input = {} } = input
   const eventName = hook_event_name || hookEventName
 
-  // PostToolUse + Write/Edit 도구만 처리
-  if (eventName !== 'PostToolUse') return process.exit(0)
-  if (!['Write', 'Edit'].includes(tool_name)) return process.exit(0)
-
   const filePath = (tool_input.file_path || '').replace(/\\/g, '/')
   if (!AGENT_MD_PATTERN.test(filePath)) return process.exit(0)
+  if (NON_AGENT_BASENAMES.has(filePath.split('/').pop())) return process.exit(0)
 
-  // Edit의 경우 content가 없으므로 간단히 경고만
-  const content = tool_input.content || tool_input.new_string || ''
+  // PreToolUse Write: tool_input.content가 저장될 전체 내용 → 사전 검증, 위반 시 저장 차단
+  // PostToolUse Edit: new_string은 파일 *일부*라 그대로 검증하면 오탐 →
+  //                   파일이 이미 갱신됐으므로 디스크에서 전체 내용을 읽어 검증
+  let content = ''
+  if (eventName === 'PreToolUse' && tool_name === 'Write') {
+    content = tool_input.content || ''
+  } else if (eventName === 'PostToolUse' && tool_name === 'Edit') {
+    try { content = fs.readFileSync(tool_input.file_path, 'utf8') } catch { return process.exit(0) }
+  } else {
+    return process.exit(0)
+  }
   if (!content) return process.exit(0)
 
   const errors = validate(content)
   if (errors.length === 0) return process.exit(0)
 
+  const blocked = eventName === 'PreToolUse'
   const message = [
-    `[agent-md-guard] ⚠️  에이전트 파일 구조 검증 실패: ${filePath}`,
+    `[agent-md-guard] ⚠️  에이전트 파일 구조 검증 실패${blocked ? ' — 저장 차단됨' : ''}: ${filePath}`,
     '',
     ...errors.map((e, i) => `${i + 1}. ${e}`),
     '',
-    '위 항목을 수정하세요. (참조: @.claude/rules/agent-design.md)',
+    blocked
+      ? '위 항목을 수정한 내용으로 다시 저장하세요. (참조: @.claude/rules/agent-design.md — 설치된 경우)'
+      : '위 항목을 수정하세요. (참조: @.claude/rules/agent-design.md — 설치된 경우)',
   ].join('\n')
 
-  process.stdout.write(JSON.stringify({ reason: message }) + '\n')
+  // exit 2 의 메시지 채널은 stderr — PreToolUse: 도구 실행 차단 사유 / PostToolUse: Claude 에게 수정 요구 피드백.
+  // (stdout {reason} 단독은 decision:"block" 이 없어 blocking 사유로 쓰이지 않고 유실됨 — 공식 hooks 문서 Exit code 2)
+  process.stderr.write(message + '\n')
   process.exit(2)
 }
 

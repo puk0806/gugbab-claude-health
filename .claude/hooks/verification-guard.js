@@ -3,18 +3,30 @@
  * verification-guard.js
  * Claude Code PostToolUse Hook
  *
- * 목적: verification.md 작성 직후 품질 자동 검증
+ * 목적: verification.md 품질 자동 검증
+ *
+ * 이벤트:
+ *   PreToolUse Write — tool_input.content 사전 검증. 위반 시 저장 자체를 차단 (exit 2)
+ *   PostToolUse Edit — 수정 반영된 파일을 디스크에서 재읽기 검증. 위반 시 수정 요구 (exit 2)
  *
  * 검사 항목:
- *   1. 에이전트 로그에 "내장" 키워드 → 서브에이전트 미호출
+ *   1. 에이전트 로그에 "내장 지식" 구문 → 조사를 내장 지식으로 대체한 자백
+ *      ("내장" 단독 매칭은 오탐 — 예: "Python 내장 자료형" 스킬의 정당한 문맥)
  *   2. frontmatter status 필드 누락
  *   3. 필수 8개 섹션 누락
  *   4. 검증 체크박스 전부 [❌] → 체크리스트 미완성
+ *   5. status: UNVERIFIED 저장 차단
  *
- * 조건: Write 도구로 docs/skills/{category}/{name}/verification.md 경로에 저장할 때만 동작
+ * 비차단 경고 (PostToolUse Edit/Write, 2026-09-30):
+ *   frontmatter date · 메타 표 `| 검증일 |` · 짝 SKILL.md `> 검증일:` 가 서로 다른 날짜면
+ *   additionalContext 로 알린다 (exit 0). 저장 차단 조건은 늘리지 않는다 — 에이전트가 네 곳을
+ *   순차 Edit 하는 중간 상태를 막게 되기 때문. 판독은 staleness-check.js 의 함수를 재사용하며,
+ *   그 파일이 설치돼 있지 않으면 조용히 생략한다.
  */
 
 const readline = require('readline')
+const fs = require('fs')
+const path = require('path')
 
 const VERIFICATION_PATH_PATTERN = /docs\/skills\/.+\/verification\.md$/
 
@@ -38,11 +50,11 @@ function validate(content) {
     errors.push('frontmatter에 status 필드가 없습니다.')
   }
 
-  // 2. 에이전트 로그 "내장" 키워드 감지
+  // 2. 에이전트 로그 "내장 지식" 구문 감지 ("내장" 단독은 정당한 문맥 오탐 — 문맥 좁힘)
   const agentLogMatch = content.match(/##\s+2\.\s+실행\s+에이전트\s+로그([\s\S]*?)(?=\n##\s+|\n---\s*$|$)/i)
-  if (agentLogMatch && /내장/.test(agentLogMatch[1])) {
+  if (agentLogMatch && /내장\s*지식/.test(agentLogMatch[1])) {
     errors.push(
-      '에이전트 로그에 "내장" 키워드가 감지됐습니다.\n' +
+      '에이전트 로그에 "내장 지식" 구문이 감지됐습니다.\n' +
       '  → skill-creator는 반드시 WebSearch/WebFetch로 공식 문서를 직접 조사·교차 검증해야 합니다.\n' +
       '  → 내장 지식으로 대체하는 것은 금지입니다. 실제 조사를 수행한 뒤 verification.md를 재작성하세요.'
     )
@@ -83,6 +95,25 @@ function validate(content) {
   return errors
 }
 
+// 날짜 불일치 경고 문자열(없으면 null). 어떤 실패도 저장 흐름을 막지 않는다.
+function dateDriftWarning(verifFile) {
+  try {
+    const { checkDateConsistency } = require('./staleness-check.js')
+    const norm = path.resolve(verifFile).replace(/\\/g, '/')
+    const i = norm.lastIndexOf('/docs/skills/')
+    if (i < 0) return null
+    const root = norm.slice(0, i)
+    const rel = path.posix.dirname(norm.slice(i + '/docs/skills/'.length))
+    const skillMd = path.join(root, '.claude', 'skills', rel, 'SKILL.md')
+    const problems = checkDateConsistency(verifFile, skillMd, { allowMissing: true })
+    if (problems.length === 0) return null
+    return `[verification-guard] ⚠️ 검증일 기록 불일치 (경고만, 저장은 완료됨): ${rel}\n` +
+      problems.map(p => `  - ${p}`).join('\n') +
+      '\n  → 재검증 시 frontmatter date · 메타 표 `| 검증일 |` · SKILL.md `> 검증일:` · 섹션 8 변경 이력을 같은 날짜로 함께 갱신하세요' +
+      ' (여러 곳을 순차 수정 중이면 마지막 수정 뒤 이 경고가 사라지는지 확인).'
+  } catch { return null }
+}
+
 async function main() {
   const rl = readline.createInterface({ input: process.stdin })
   let raw = ''
@@ -97,28 +128,44 @@ async function main() {
   const { hook_event_name, hookEventName, tool_name, tool_input = {} } = input
   const eventName = hook_event_name || hookEventName
 
-  // PostToolUse + Write 도구만 처리
-  if (eventName !== 'PostToolUse' || tool_name !== 'Write') return process.exit(0)
-
   const filePath = (tool_input.file_path || '').replace(/\\/g, '/')
   if (!VERIFICATION_PATH_PATTERN.test(filePath)) return process.exit(0)
 
-  const content = tool_input.content || ''
-  const errors = validate(content)
+  // PreToolUse Write: 저장될 전체 내용을 사전 검증 → 위반 시 저장 차단
+  // PostToolUse Edit: 파일이 이미 갱신됐으므로 디스크에서 전체 재읽기 검증
+  let content = ''
+  if (eventName === 'PreToolUse' && tool_name === 'Write') {
+    content = tool_input.content || ''
+  } else if (eventName === 'PostToolUse' && (tool_name === 'Edit' || tool_name === 'Write')) {
+    try { content = fs.readFileSync(tool_input.file_path, 'utf8') } catch { return process.exit(0) }
+  } else {
+    return process.exit(0)
+  }
+  if (!content) return process.exit(0)
 
-  if (errors.length === 0) return process.exit(0)
+  // PostToolUse Write 는 Pre 단계가 이미 검증·차단했다 — 여기서는 새 차단 없이 날짜 경고만.
+  const errors = eventName === 'PostToolUse' && tool_name === 'Write' ? [] : validate(content)
+  if (errors.length === 0) {
+    if (eventName === 'PostToolUse') {
+      const warn = dateDriftWarning(tool_input.file_path)
+      if (warn) process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: warn } }))
+    }
+    return process.exit(0)
+  }
 
+  const blocked = eventName === 'PreToolUse'
   const message = [
-    `[verification-guard] ❌ verification.md 검증 실패: ${filePath}`,
+    `[verification-guard] ❌ verification.md 검증 실패${blocked ? ' — 저장 차단됨' : ''}: ${filePath}`,
     '',
     ...errors.map((e, i) => `${i + 1}. ${e}`),
     '',
-    '위 문제를 수정한 뒤 verification.md를 재작성하세요.',
+    blocked ? '위 문제를 수정한 내용으로 다시 저장하세요.' : '위 문제를 수정한 뒤 verification.md를 재작성하세요.',
   ].join('\n')
 
-  // PostToolUse: stdout 출력 → Claude에게 피드백으로 전달
-  process.stdout.write(JSON.stringify({ reason: message }) + '\n')
-  process.exit(2) // exit 2 = 오류 신호, Claude가 수정 필요성 인식
+  // exit 2 의 메시지 채널은 stderr — PreToolUse: 도구 실행 차단 사유 / PostToolUse: Claude 에게 수정 요구 피드백.
+  // (stdout {reason} 단독은 decision:"block" 이 없어 blocking 사유로 쓰이지 않고 유실됨 — 공식 hooks 문서 Exit code 2)
+  process.stderr.write(message + '\n')
+  process.exit(2)
 }
 
 main().catch(() => process.exit(0))

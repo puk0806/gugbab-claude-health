@@ -8,10 +8,11 @@ description: >
 
 # Claude API Streaming — Frontend Pattern
 
-> 소스: https://platform.claude.com/docs/en/api/messages-streaming · https://platform.claude.com/docs/en/api/messages · https://platform.claude.com/docs/en/build-with-claude/prompt-caching · https://platform.claude.com/docs/en/api/errors · https://github.com/anthropics/anthropic-sdk-typescript · https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events
-> 검증일: 2026-05-14
-> 버전 기준: Messages API `anthropic-version: 2023-06-01`, TypeScript SDK `@anthropic-ai/sdk` v0.96.0, MDN SSE 표준
-> 짝 스킬: `frontend/chat-ui-pattern` (메시지 리스트·virtuoso·스크롤 동작) / `meta/dream-interpretation-prompt-engineering` (system 프롬프트 설계)
+> 소스: https://platform.claude.com/docs/en/api/messages-streaming · https://platform.claude.com/docs/en/api/messages · https://platform.claude.com/docs/en/build-with-claude/prompt-caching · https://platform.claude.com/docs/en/api/errors · https://platform.claude.com/docs/en/build-with-claude/adaptive-thinking · https://platform.claude.com/docs/en/about-claude/models/migration-guide · https://github.com/anthropics/anthropic-sdk-typescript · https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events · https://nextjs.org/docs/app/api-reference/file-conventions/route-segment-config/runtime
+> 검증일: 2026-09-28 (재검증 2차, 이전 2026-08-12) — 갱신 사유: ① SDK v0.116.0 → **v0.128.0**(npm latest, 2026-09-22 배포) 갱신. 0.116→0.128 구간 changelog 전수 확인 결과 본 스킬이 다루는 Messages/Streaming API·delta 타입·캐싱에 breaking change 없음(claude-opus-5-5 모델 지원 추가, Files/Skills GA, rate limits API 개편 등은 본 스킬 범위 밖) ② §4-1 Next.js 예제를 **Next.js 16 기준**(Edge Runtime deprecated → Node.js 런타임)으로 갱신 ③ 최소 캐시 토큰(REFERENCE.md) Opus 5.5 = **512**로 공식 확인(이전 "미확인" 표기 정정)
+> 버전 기준: Messages API `anthropic-version: 2023-06-01`, TypeScript SDK `@anthropic-ai/sdk` v0.128.0 (npm latest, 2026-09-28 확인), MDN SSE 표준, Next.js 16.3 (Route Handler 기본 런타임 `nodejs`, `edge`는 deprecated)
+> 모델 기준 (2026-09-25 현행화): Claude Opus 5.5(`claude-opus-5-5`) / Fable 5.1(`claude-fable-5-1`) / Sonnet 5(`claude-sonnet-5`) / Haiku 4.5(`claude-haiku-4-5`) — 예제 코드는 채팅용 `claude-sonnet-5` 사용
+> 짝 스킬(설치된 경우 참조): `frontend/chat-ui-pattern` (메시지 리스트·virtuoso·스크롤 동작) / `meta/dream-interpretation-prompt-engineering` (system 프롬프트 설계)
 
 ---
 
@@ -93,10 +94,16 @@ data: {"type":"message_stop"}
 |--------------|-----------|-----------|
 | `text_delta` | 일반 텍스트 응답 | `delta.text` 문자열 연결 |
 | `input_json_delta` | tool_use 입력 | `delta.partial_json` 연결 후 `content_block_stop`에서 `JSON.parse` |
-| `thinking_delta` | extended thinking | `delta.thinking` 연결 |
+| `thinking_delta` | adaptive thinking | `delta.thinking` 연결 |
 | `signature_delta` | thinking 종료 직전 | `delta.signature` 1회 (무결성 검증용) |
 
 > 주의: `message_delta.usage`의 토큰 카운트는 *누적값*이지 증분이 아니다.
+
+> **주의 — 5 계열에서 `thinking.display` 기본값은 `"omitted"`다.** Opus 5.5·Opus 5는 사고가 기본 ON이지만(Opus 5.5는 끌 수도 없다),
+> 기본 설정에서는 `thinking` 블록이 **빈 문자열**로 스트리밍된다. 프론트 입장에서는
+> *출력 시작 전 긴 정지*로 보이므로, 추론 요약을 사용자에게 보여주려면 백엔드 요청에
+> `thinking: { type: 'adaptive', display: 'summarized' }`를 **명시**해야 한다.
+> `display`는 노출 여부만 바꾸며, 사고 자체는 어느 설정에서든 동일하게 수행·과금된다.
 
 ---
 
@@ -270,13 +277,13 @@ export function ChatBox() {
 
 ## 4. 백엔드 프록시 변형
 
-### 4-1. Next.js 15 Route Handler (Edge runtime)
+### 4-1. Next.js 16 Route Handler (Node.js runtime)
+
+> 주의 (2026-09-28 확인): Next.js는 16.1부터 Route Handler의 `export const runtime = 'edge'`를 **deprecated** 처리했다(공식: *"Remove the `runtime` export from your route files... The Node.js runtime is the default, so no replacement is needed."*). `runtime` 옵션 값 자체가 `'nodejs' | 'edge' (deprecated)`로 표기되며 기본값이 `'nodejs'`다. 아래 예제는 `runtime` export를 제거하고 기본 Node.js 런타임을 사용한다 — 기존에 `runtime = 'edge'`로 작성된 프록시가 있다면 그 줄만 지우면 되고(SSE `ReadableStream`·`for await` 로직은 변경 불필요), Node.js 런타임에서도 동일하게 동작한다.
 
 ```ts
 // app/api/claude/stream/route.ts
 import Anthropic from '@anthropic-ai/sdk';
-
-export const runtime = 'edge';
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 
@@ -284,7 +291,7 @@ export async function POST(req: Request) {
   const { prompt } = await req.json();
 
   const upstream = await client.messages.create({
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     max_tokens: 1024,
     system: [
       {
@@ -359,7 +366,7 @@ const client = new Anthropic({
 });
 
 const stream = client.messages.stream({
-  model: 'claude-sonnet-4-6',
+  model: 'claude-sonnet-5',
   max_tokens: 1024,
   messages: [{ role: 'user', content: 'Hello' }],
 });

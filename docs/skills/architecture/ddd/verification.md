@@ -1,8 +1,8 @@
 ---
 skill: ddd
 category: architecture
-version: v1
-date: 2026-04-17
+version: v2.3
+date: 2026-09-28
 status: APPROVED
 ---
 
@@ -35,9 +35,9 @@ status: APPROVED
 |------|------|
 | 스킬 이름 | `ddd` |
 | 스킬 경로 | `.claude/skills/architecture/ddd/SKILL.md` |
-| 검증일 | 2026-04-17 |
+| 검증일 | 2026-09-28 (최초 2026-04-17 · 재검증 08-26, 09-28) |
 | 검증자 | fact-checker 서브에이전트 (메인 대화 오케스트레이션) |
-| 스킬 버전 | v1 |
+| 스킬 버전 | v2.3 |
 
 ---
 
@@ -51,7 +51,7 @@ status: APPROVED
 - [✅] 흔한 실수 패턴 정리
 - [✅] fact-checker 서브에이전트로 10개 클레임 교차 검증
 - [✅] DISPUTED 3건 수정 반영 후 SKILL.md 파일 작성
-- [✅] Claude Code 에이전트에서 실제 활용 테스트 (스타일링크 요구사항 분석 PASS)
+- [✅] Claude Code 에이전트에서 실제 활용 테스트 (가상 이커머스 요구사항 분석 PASS)
 
 ---
 
@@ -143,11 +143,11 @@ status: APPROVED
 
 ## 5. 테스트 진행 기록
 
-### 테스트 케이스 1: 실제 이커머스 프로젝트(lf-ui) exhibition 도메인 분석
+### 테스트 케이스 1: 실 프론트엔드 이커머스 프로젝트 exhibition 도메인 분석
 
 **입력 (질문/요청):**
 ```
-/Users/lf/Desktop/workspace/00_lf-ui/lf-ui 프로젝트의
+사내 프론트엔드 이커머스 프로젝트의
 exhibition(전시) 도메인을 DDD 스킬 기반으로 분석해줘.
 ```
 
@@ -165,7 +165,7 @@ exhibition(전시) 도메인을 DDD 스킬 기반으로 분석해줘.
 - ✅ 현재 아키텍처 패턴 파악 (CMS-driven UI + Feature-Hook 패턴)
 - ✅ DDD 관점 진단 — Big Ball of Mud, Anemic Domain Model, 레이어 경계 위반 식별
 - ⚠️ 12개 항목은 프론트엔드 코드만으로 파악 불가 → 실제 소스 확인 필요로 표시
-- 상세 보고서: `docs/domain/lf-ui-exhibition-analysis-2026-04-17.md`
+- 상세 보고서는 대상 프로젝트 리포지토리 내부 문서로 별도 보관 (이 레포에는 포함되지 않음)
 
 **판정:** ⚠️ PARTIAL — 스킬 개념 적용은 정상 동작. 일부 항목은 실제 비즈니스 소스 확인 필요로 표시하고 보류.
 
@@ -173,11 +173,11 @@ exhibition(전시) 도메인을 DDD 스킬 기반으로 분석해줘.
 
 ---
 
-### 테스트 케이스 2: 이커머스 비즈니스 요구사항 텍스트 기반 DDD 분석 (스타일링크)
+### 테스트 케이스 2: 이커머스 비즈니스 요구사항 텍스트 기반 DDD 분석 (가상 사례)
 
 **입력 (질문/요청):**
 ```
-온라인 패션 쇼핑몰 "스타일링크" 비즈니스 요구사항 텍스트 (주문/상품/결제/배송/회원 5개 영역)를
+온라인 패션 쇼핑몰(가상 사례) 비즈니스 요구사항 텍스트 (주문/상품/결제/배송/회원 5개 영역)를
 DDD SKILL.md를 참조하여 분석.
 ```
 
@@ -201,6 +201,26 @@ DDD SKILL.md를 참조하여 분석.
 - ✅ 도메인 이벤트 10개 — 과거형 명명, 발행 Aggregate 및 구독 컨텍스트 명시
 
 **판정:** ✅ PASS — DDD 핵심 개념 전체 정확히 적용. Evans/Vernon 출처 기준 오류 없음.
+
+---
+
+### [2026-09-28] 재검증(2차) — 서적 기반 클레임 재대조, 변경 없음
+
+**수행일**: 2026-09-28
+**수행 방법**: SKILL.md 전체 Read → 핵심 클레임 3개를 1차 소스와 WebSearch로 대조
+
+**클레임 대조 결과**:
+1. 컨텍스트 맵 9패턴(Shared Kernel/Customer-Supplier/Conformist/ACL/OHS/PL/Separate Ways/Partnership/Big Ball of Mud) — VERIFIED (Evans DDD Reference PDF, domainlanguage.com/wp-content/uploads/2016/05/DDD_Reference_2015-03.pdf 목록과 일치)
+2. Vernon Aggregate 설계 4원칙(진짜 불변식만 경계로/작게 설계/ID 참조/결과적 일관성, 트랜잭션당 Aggregate 1개) — VERIFIED (dddcommunity.org/library/vernon_2011/ Effective Aggregate Design)
+3. Domain Events — Evans 원저(2003) 미공식화, Vernon IDDD(2013) 체계화, Evans DDD Reference(2015 개정)에서 공식 전술 패턴 추가 — VERIFIED (기존 출처 재확인, 변경 없음)
+
+**보강(ADD)·축소**: 없음 — 서적(2003/2013) 및 2015 개정 Reference 기반 콘텐츠로 그사이 변경 사항 없음
+
+**실전 질문 재검증**:
+- Q1. "Aggregate 간 참조는 어떻게 해야 하는가?" → SKILL.md "5. Aggregate와 Aggregate Root" 근거로 PASS (ID로만 참조, Vernon 강조)
+- Q2. "컨텍스트 맵에서 하류가 상류 모델에 전혀 협조받지 못할 때 쓰는 패턴은?" → SKILL.md "4. 컨텍스트 맵" 표 근거로 PASS (Conformist)
+
+**재검증 최종 판정**: status **APPROVED 유지**
 
 ---
 
@@ -228,4 +248,8 @@ DDD SKILL.md를 참조하여 분석.
 | 날짜 | 버전 | 변경 내용 | 변경자 |
 |------|------|-----------|--------|
 | 2026-04-17 | v1 | 최초 작성. fact-checker 10개 클레임 검증, DISPUTED 3건 수정 반영 | fact-checker 서브에이전트 (메인 대화 오케스트레이션) |
-| 2026-04-17 | v2 | 테스트 케이스 2 추가 (스타일링크 요구사항 텍스트 기반 분석 PASS), APPROVED 전환 | 메인 대화 오케스트레이션 |
+| 2026-04-17 | v2 | 테스트 케이스 2 추가 (가상 이커머스 요구사항 텍스트 기반 분석 PASS), APPROVED 전환 | 메인 대화 오케스트레이션 |
+| 2026-08-26 | v2.1 | freshness 재검증(131일 경과) — 서적 기반(Evans 2003·Vernon 2013) 클레임 3건 VERIFIED, 변경 없음. 프론트엔드 적용 절 부재는 신설된 `architecture/frontend-domain-structure`가 담당하므로 검증일 줄에 포인터만 추가 | freshness-auditor + orchestrator |
+| 2026-09-25 | v2.2 | 로컬 경로·프로젝트명 일반화 (내용 변경 없음) | docs cleanup |
+| 2026-09-25 | v2.2 | 교차 참조 조건부 표기 (내용 변경 없음) | Claude (Sonnet 5) |
+| 2026-09-28 | v2.3 | 재검증(2차) — 핵심 클레임 3건 1차 소스 재대조, 변경 없음(검증일만 갱신) | Claude (Sonnet 5) |

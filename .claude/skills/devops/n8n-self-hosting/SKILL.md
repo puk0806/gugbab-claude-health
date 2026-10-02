@@ -7,20 +7,28 @@ disable-model-invocation: true
 # n8n Self-Hosting
 
 > 소스:
-> - https://docs.n8n.io/hosting/
-> - https://docs.n8n.io/hosting/installation/docker/
-> - https://docs.n8n.io/hosting/installation/server-setups/docker-compose/
-> - https://docs.n8n.io/hosting/configuration/environment-variables/database/
-> - https://docs.n8n.io/hosting/configuration/configuration-examples/encryption-key/
-> - https://docs.n8n.io/hosting/scaling/queue-mode/
-> - https://docs.n8n.io/hosting/configuration/user-management-self-hosted/
-> - https://docs.n8n.io/sustainable-use-license/
-> - https://docs.n8n.io/2-0-breaking-changes/
+> - https://docs.n8n.io/deploy/host-n8n/install-options/install-with-docker.md
+> - https://docs.n8n.io/deploy/host-n8n/install-options/use-a-cloud-provider/use-docker-compose.md
+> - https://docs.n8n.io/deploy/host-n8n/configure-n8n/basic-configuration/use-environment-variables/database.md
+> - https://docs.n8n.io/deploy/host-n8n/configure-n8n/basic-configuration/use-environment-variables/deployment.md
+> - https://docs.n8n.io/deploy/host-n8n/configure-n8n/basic-configuration/use-environment-variables/queue-mode.md
+> - https://docs.n8n.io/deploy/host-n8n/configure-n8n/basic-configuration/use-environment-variables/nodes.md
+> - https://docs.n8n.io/deploy/host-n8n/configure-n8n/basic-configuration/configuration-examples/set-a-custom-encryption-key.md
+> - https://docs.n8n.io/deploy/host-n8n/configure-n8n/scaling/enable-queue-mode.md
+> - https://docs.n8n.io/deploy/host-n8n/configure-n8n/set-up-task-runners.md
+> - https://docs.n8n.io/deploy/host-n8n/configure-n8n/user-management.md
+> - https://docs.n8n.io/deploy/host-n8n/configure-n8n/durable-scheduler.md
+> - https://docs.n8n.io/privacy-and-security/sustainable-use-license
+> - https://docs.n8n.io/changelog/release-notes.md (현행 — 2.x 통합, `release-notes-2.x`는 2026-09 기준 archived)
 > - https://github.com/n8n-io/n8n-hosting
 >
-> 검증일: 2026-05-15
-> 대상 버전: n8n v2.x (stable tag, 2026-05 기준 v2.21.x)
+> 검증일: 2026-09-28 (최초 2026-05-15, 재검증 2026-08-11 / 2026-09-28)
+> 대상 버전: n8n v2.x — **2026-09-28 기준 stable v2.40.7 / beta v2.41.3**
 > 짝 스킬: `devops/docker-deployment` (컨테이너 일반), `devops/n8n-workflow-design` (워크플로우 설계)
+
+> **주의 — 공식 문서 URL 전면 개편 (2026-08 확인):** 구 `docs.n8n.io/hosting/...` 경로는 전부 404다.
+> 현재 구조는 `docs.n8n.io/deploy/host-n8n/...`. 북마크·CI 링크체크·사내 위키에 구 경로가 남아 있으면 갱신할 것.
+> 경로를 모를 때는 `https://docs.n8n.io/sitemap.md`로 현재 트리를 확인한다.
 
 ---
 
@@ -70,7 +78,6 @@ docker run -d \
   -e GENERIC_TIMEZONE="Asia/Seoul" \
   -e TZ="Asia/Seoul" \
   -e N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true \
-  -e N8N_RUNNERS_ENABLED=true \
   -v n8n_data:/home/node/.n8n \
   docker.n8n.io/n8nio/n8n:stable
 ```
@@ -80,9 +87,16 @@ docker run -d \
 | `GENERIC_TIMEZONE` | 스케줄러 노드(Cron 등) 타임존 |
 | `TZ` | 컨테이너 OS 타임존 |
 | `N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true` | `~/.n8n/config` 파일 `0600` 권한 강제 |
-| `N8N_RUNNERS_ENABLED=true` | Task runner 활성화 (v2.0+ 권장 기본값) |
+
+> **변경 (v2.0+):** `N8N_RUNNERS_ENABLED`는 **deprecated**다. v2.0부터 task runner가 항상 켜져 있어 이 변수를 지정할 필요가 없다
+> (공식 문서에서도 제거됨 — n8n-docs issue #4328 / PR #4450). **v1.x에서만** `true` 지정이 필요하다.
+> 기존 compose 파일에 남아 있으면 삭제한다. → 실행 격리 설정은 `references/REFERENCE.md` "11-1. Task runner 모드 (Code 노드 격리)" 절 참조.
+
+**이미지 태그 선택:** 태그를 생략한 `docker.n8n.io/n8nio/n8n`은 최신 stable을 가리킨다. 프로덕션은 재현 가능한 배포를 위해
+버전 핀(`:2.40.7`)을 권장하고, `:stable`은 "최신 안정판 자동 추종"이 필요할 때만 쓴다. `:next`는 beta(2.41.x) 채널이다.
 
 > 주의: 단일 컨테이너 + SQLite 조합은 동시 쓰기·큐 모드를 지원하지 않는다. 프로덕션은 PostgreSQL로 갈 것.
+> 단, PostgreSQL로 가더라도 **`~/.n8n` 볼륨은 계속 유지**한다 — encryption key 등이 이 디렉토리에 있다.
 
 ---
 
@@ -127,11 +141,11 @@ services:
       N8N_HOST: ${N8N_HOST}                       # 예: n8n.example.com
       N8N_PROTOCOL: https
       N8N_PORT: 5678
-      WEBHOOK_URL: https://${N8N_HOST}/
+      N8N_WEBHOOK_URL: https://${N8N_HOST}/       # 구 WEBHOOK_URL — v2.40.7 실행 로그 기준 deprecated alias(여전히 동작은 함, 신규 구성은 N8N_WEBHOOK_URL 사용)
       # Security
       N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
       N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: 'true'
-      N8N_RUNNERS_ENABLED: 'true'
+      # (N8N_RUNNERS_ENABLED는 v2.0+에서 deprecated — 지정하지 않는다)
       # Locale
       GENERIC_TIMEZONE: Asia/Seoul
       TZ: Asia/Seoul
@@ -189,7 +203,7 @@ openssl rand -hex 32
 | `N8N_HOST` | `localhost` | 외부에서 접근할 호스트명 (예: `n8n.example.com`) |
 | `N8N_PROTOCOL` | `http` | `https` 권장 |
 | `N8N_PORT` | `5678` | 컨테이너 내부 포트 |
-| `WEBHOOK_URL` | `${N8N_PROTOCOL}://${N8N_HOST}:${N8N_PORT}/` | 외부 webhook 콜백 URL. 리버스 프록시 뒤에서는 명시 필수 |
+| `N8N_WEBHOOK_URL`(구 `WEBHOOK_URL`) | `${N8N_PROTOCOL}://${N8N_HOST}:${N8N_PORT}/` | 외부 webhook 콜백 URL. 리버스 프록시 뒤에서는 명시 필수. **2026-09-28 실측(v2.40.7 기동 로그): `WEBHOOK_URL`은 deprecated alias — "Use N8N_WEBHOOK_URL instead" 경고 노출(동작은 계속함)** |
 | `DB_TYPE` | `sqlite` | 프로덕션은 `postgresdb` |
 | `DB_POSTGRESDB_HOST` | `localhost` | PostgreSQL 호스트 |
 | `DB_POSTGRESDB_PORT` | `5432` | PostgreSQL 포트 |
@@ -202,10 +216,36 @@ openssl rand -hex 32
 | `N8N_ENCRYPTION_KEY` | (자동 생성) | **반드시 명시 + 백업**. credentials 암호화에 사용 |
 | `GENERIC_TIMEZONE` | `America/New_York` | 스케줄러 타임존 |
 | `N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS` | `false` (v1) → `true` 권장 | settings 파일 `0600` 권한 강제 |
-| `N8N_RUNNERS_ENABLED` | v2.0+ `true` | Task runner 활성화 |
+| `N8N_RUNNERS_ENABLED` | — | **v2.0+ deprecated — 지정하지 않는다.** v1.x에서만 `true` 필요 |
 | `EXECUTIONS_MODE` | `regular` | 큐 모드는 `queue` |
 
+### v2.1x~2.2x에서 추가된 운영 변수
+
+| 변수 | 도입 | 용도 |
+|------|------|------|
+| `N8N_OTEL_ENABLED` / `N8N_OTEL_EXPORTER_OTLP_ENDPOINT` | v2.15 | 워크플로우 실행 트레이스를 OTLP 컬렉터로 전송 (관측성) |
+| `N8N_TOKEN_EXCHANGE_TRUSTED_KEYS` | v2.16 | OAuth 2.0 Token Exchange 인증 (임베디드 사용) |
+| `N8N_INSIGHTS_MAX_AGE_DAYS` | v2.20 | Insights 데이터 보존 기간 (기본 365일, 최대 730일) |
+
+> v2.19부터 **instance bootstrapping** — 최초 기동 시 환경 변수만으로 인스턴스 전체 설정을 주입할 수 있다. IaC로 n8n을 굽는 경우 유용.
+
 > 주의 (v2.0 변경): `N8N_BLOCK_ENV_ACCESS_IN_NODE=true`가 기본. Code 노드에서 `process.env` 접근이 기본 차단된다. 필요 시 명시적으로 `false` 지정.
+
+### v2.34~2.40에서 추가된 운영 변수 (2026-09-28 확인)
+
+| 변수 | 도입 | 기본값 | 용도 |
+|------|------|--------|------|
+| `N8N_SCHEDULER_ENABLED` | v2.36 (GA, v2.32~2.35은 Preview) | `false` | **Durable scheduler** 활성화 — Schedule Trigger 등 시간 기반 워크플로우를 인스턴스 메모리 타이머 대신 DB-backed 큐로 실행 (재시작 생존, 멀티 인스턴스 분산) |
+| `N8N_USE_WORKFLOW_PUBLICATION_SERVICE` | v2.36 | — | Durable scheduler가 Schedule Trigger 노드를 넘겨받기 위한 필수 동반 설정. `N8N_SCHEDULER_ENABLED`와 함께 `true` 필요 |
+| `N8N_SCHEDULER_POLL_TRIGGERS_ENABLED` | v2.36 | `false` | 폴링 트리거(Google Sheets 등)까지 durable scheduler 대상에 포함 |
+| `N8N_SCHEDULER_SYSTEM_TASKS_ENABLED` | v2.40 | `false` | n8n 내부 유지보수 작업을 durable scheduler로 이관 (2.40.0 시점엔 이관된 작업 없음 — 단계적 롤아웃) |
+| `N8N_ENV_FEAT_SKIP_DURABLE_SCHEDULER` | v2.36 | `false` | durable scheduler가 인스턴스 전체에 켜져 있어도 특정 Schedule Trigger 노드만 인메모리 방식으로 남기는 escape hatch |
+| `NODES_MERGE_SQL_SANDBOX_MEMORY_LIMIT_MB` | v2.38.1 | `64` | Merge 노드 "Combine by SQL" 샌드박스 메모리 한도(MB). 대용량 데이터셋에서 실패 시 증가 |
+| `N8N_COMPRESSION_NODE_MAX_DECOMPRESSED_SIZE_BYTES` | — | **`2147483648`(2GiB) — 2026-09-28 실측 정정** (구 서술 `268435456`/256MiB는 오류) | Compression 노드 압축 해제 결과 최대 크기 — zip bomb 방지. v2.40.7 기동 로그: "default ... will be reduced from 2 GiB to 256 MiB in a future version" — 256MiB는 **향후 버전 예정값**이지 현재 기본값이 아님. 현재 한도를 유지하려면 명시적으로 지정할 것 |
+| `N8N_COMPRESSION_NODE_MAX_ZIP_ENTRIES` | — | **`5000` — 2026-09-28 실측 정정** (구 서술 `1000`은 오류) | Compression 노드가 처리할 ZIP 엔트리 수 상한. v2.40.7 기동 로그: "default ... will be reduced from 5000 to 1000 in a future version" — 1000은 **향후 버전 예정값** |
+| `N8N_AZURE_STORAGE_CUSTOM_ENDPOINTS_ENABLED` | v2.40 | `false` | Azure Storage credential의 커스텀 엔드포인트(소버린 클라우드·프라이빗 엔드포인트) 허용 여부. 꺼져 있으면 커스텀 엔드포인트 credential이 테스트 실패 |
+
+> **Durable scheduler 도입 시 주의:** 기존 인스턴스는 기본적으로 인메모리 스케줄러를 계속 쓴다(opt-in). 켠 뒤 되돌려도(`false`) 이미 만들어진 durable 커서·스케줄 테이블은 자동 삭제되지 않는다("Cursors stay in their table"). 큐 모드(11절)와 별개 기능이지만 멀티 인스턴스·재시작 내구성이 필요하면 함께 검토.
 
 ---
 
@@ -213,6 +253,7 @@ openssl rand -hex 32
 
 - **왜 PostgreSQL?** SQLite는 단일 프로세스 쓰기만 안전하다. 큐 모드·다중 워커·고가용성을 위해 PostgreSQL 필수.
 - **버전 권장:** PostgreSQL 14+ (위 예시는 16 사용).
+  > 주의 (2026-09-28 실측, v2.40.7 기동 로그): `Postgres 16 is outside the supported range and receives compatibility support only. Upgrade to Postgres 17 or newer.` — 14~16은 더 이상 완전 지원 대상이 아니고 "호환성 지원"으로 격하됨. 신규 구축은 **PostgreSQL 17+**를 우선 고려할 것 (16은 여전히 기동·마이그레이션·실행 자체는 정상 동작 확인됨 — 즉시 차단 사유는 아님).
 - **v2.0부터 MySQL/MariaDB 지원 중단.** PostgreSQL만 공식 지원.
 
 **처음 PostgreSQL로 전환할 때 주의:**
@@ -231,7 +272,7 @@ openssl rand -hex 32
 | **Cloudflare Tunnel** | 포트 개방 없이 외부 노출. webhook URL은 Cloudflare 도메인 |
 | **Nginx + certbot** | 기존 Nginx 인프라가 있을 때 |
 
-**webhook URL 주의:** 리버스 프록시 뒤에 있을 때 `WEBHOOK_URL`을 외부 URL로 명시하지 않으면 외부 서비스(GitHub, Stripe 등)가 잘못된 URL로 callback을 보낸다.
+**webhook URL 주의:** 리버스 프록시 뒤에 있을 때 `N8N_WEBHOOK_URL`(구 `WEBHOOK_URL` — 2026-09-28 실측 기준 deprecated alias)을 외부 URL로 명시하지 않으면 외부 서비스(GitHub, Stripe 등)가 잘못된 URL로 callback을 보낸다.
 
 ---
 
@@ -296,192 +337,6 @@ docker compose exec n8n n8n export:credentials --all --output=/home/node/.n8n/ex
 
 ---
 
-## 10. 업그레이드
-
-n8n은 거의 매주 minor 버전을 출시한다. Docker 업그레이드:
-
-```bash
-# docker-compose
-docker compose pull
-docker compose up -d
-
-# 단일 컨테이너
-docker pull docker.n8n.io/n8nio/n8n:stable
-docker stop n8n && docker rm n8n
-docker run -d ... docker.n8n.io/n8nio/n8n:stable
-```
-
-DB 마이그레이션은 컨테이너 시작 시 자동 수행된다. **업그레이드 전 반드시:**
-
-1. PostgreSQL dump
-2. `~/.n8n` 볼륨 스냅샷 (가능하면)
-3. 릴리즈 노트 확인 (특히 major 버전 변경 — v1 → v2 등)
-
-**v1 → v2 주요 breaking changes (2026 기준):**
-- MySQL/MariaDB 지원 제거 → PostgreSQL만
-- `N8N_BLOCK_ENV_ACCESS_IN_NODE` 기본값 `true`
-- `N8N_SKIP_AUTH_ON_OAUTH_CALLBACK` 기본값 `false`
-- `N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS` 동작 강화 (0600 강제)
-- Task runner: 기본 이미지에서 분리. 외부 runner 모드는 `n8nio/runners` 이미지 사용
-
-업그레이드 후 워크플로우 실행이 실패하면 → 컨테이너 로그(`docker compose logs n8n`)에서 마이그레이션 오류 확인.
-
 ---
 
-## 11. 큐 모드 (대규모 운영)
-
-워크플로우 실행 부하가 커지면 큐 모드로 전환한다. 메인 인스턴스가 webhook/스케줄을 받아 Redis 큐에 작업을 넣고, 여러 워커가 큐에서 작업을 가져와 실행한다.
-
-**필수 조건:**
-- **PostgreSQL** (SQLite 불가)
-- **Redis 6.0+** (메시지 브로커)
-- 모든 인스턴스가 **동일한 `N8N_ENCRYPTION_KEY`** 공유
-
-```yaml
-services:
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    volumes:
-      - redis_data:/data
-
-  n8n-main:
-    image: docker.n8n.io/n8nio/n8n:stable
-    environment:
-      EXECUTIONS_MODE: queue
-      QUEUE_BULL_REDIS_HOST: redis
-      QUEUE_BULL_REDIS_PORT: 6379
-      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
-      DB_TYPE: postgresdb
-      # ... DB 변수들
-    depends_on: [postgres, redis]
-
-  n8n-worker:
-    image: docker.n8n.io/n8nio/n8n:stable
-    command: worker --concurrency=10
-    environment:
-      EXECUTIONS_MODE: queue
-      QUEUE_BULL_REDIS_HOST: redis
-      QUEUE_BULL_REDIS_PORT: 6379
-      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}    # 메인과 반드시 동일
-      DB_TYPE: postgresdb
-      # ... DB 변수들
-    depends_on: [postgres, redis]
-    deploy:
-      replicas: 3                                   # 워커 3개
-```
-
-**워커 스케일링 원칙:**
-- 큰 워커 하나보다 **작은 워커 여러 개**가 효율적 (CPU 병렬·burst 흡수)
-- 워커당 메모리 200~500MB
-- `--concurrency` 기본 10. 워크플로우 무게에 따라 5~20
-
----
-
-## 12. 보안 베스트 (요약)
-
-| 항목 | 권장 사항 |
-|------|---------|
-| `N8N_ENCRYPTION_KEY` | 환경 변수로 명시 + 비밀 저장소에 별도 백업 |
-| HTTPS | 외부 노출 시 필수. Caddy/Traefik으로 자동 발급 |
-| User Management | 첫 노출 전에 owner 계정 생성. 2FA 활성화 |
-| webhook URL | 강력한 path 또는 인증 노드(Webhook 노드의 Authentication 옵션) |
-| `N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS` | `true` (v2 기본) |
-| `N8N_BLOCK_ENV_ACCESS_IN_NODE` | `true` 유지 (v2 기본). 꼭 필요할 때만 `false` |
-| 공개 API | 사용 안 하면 `N8N_PUBLIC_API_DISABLED=true` |
-| 데이터 보존 | `EXECUTIONS_DATA_PRUNE=true` + `EXECUTIONS_DATA_MAX_AGE` (시간 단위) |
-| SSRF 보호 | `N8N_BLOCK_FILE_ACCESS_TO_N8N_FILES`, `N8N_RESTRICT_FILE_ACCESS_TO` 설정 |
-| Code 노드 격리 | Task runner 모드(`n8nio/runners` 이미지) 활용 |
-
----
-
-## 13. 흔한 함정
-
-### 함정 1: `N8N_ENCRYPTION_KEY`를 명시하지 않고 운영
-
-자동 생성 키가 `~/.n8n/config`에만 존재한다. 볼륨이 사라지면 모든 credentials를 잃는다.
-
-```yaml
-# 잘못
-n8n:
-  image: docker.n8n.io/n8nio/n8n:stable
-  # N8N_ENCRYPTION_KEY 없음 → 자동 생성, 볼륨 의존
-```
-
-```yaml
-# 맞음
-n8n:
-  environment:
-    N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}      # .env에 명시 + 별도 백업
-```
-
-### 함정 2: 리버스 프록시 뒤에서 `WEBHOOK_URL` 누락
-
-`https://n8n.example.com/` 도메인을 쓰는데 `WEBHOOK_URL`을 지정하지 않으면 n8n이 `http://localhost:5678/` 같은 내부 URL을 webhook 등록 URL로 외부에 알린다 → GitHub/Stripe 등 외부 서비스가 콜백 실패.
-
-```yaml
-WEBHOOK_URL: https://${N8N_HOST}/                  # 슬래시로 끝나야 함
-```
-
-### 함정 3: SQLite로 시작 → 나중에 PostgreSQL 전환
-
-SQLite → PostgreSQL 자동 마이그레이션은 없다. 한참 운영 후 전환 시:
-1. SQLite 모드로 `n8n export:workflow --all` + `export:credentials --all` 실행
-2. PostgreSQL 빈 DB로 새 인스턴스 기동
-3. `n8n import:workflow --input=...` + `import:credentials --input=...` 수행
-
-처음부터 PostgreSQL로 시작하는 것이 가장 안전.
-
-### 함정 4: 인증 없이 외부 노출
-
-n8n을 EC2 public IP에 띄우고 User Management owner 계정도 안 만든 채로 외부 접속을 허용하면, 첫 접속자(악의적 외부인)가 owner가 된다. **설치 직후 즉시 owner 계정 생성 → 그 후에 방화벽 개방** 순서를 지킬 것.
-
-### 함정 5: 큐 모드 워커에 다른 encryption key 설정
-
-워커가 메인과 다른 `N8N_ENCRYPTION_KEY`를 갖고 있으면 DB에서 credentials를 복호화할 수 없어 워크플로우가 silent하게 실패한다 (로그도 모호함). docker-compose에서 동일 환경 변수 참조로 통일.
-
-### 함정 6: v1 → v2 업그레이드 시 `N8N_RUNNERS_ENABLED` 누락
-
-v2.0부터 task runner가 기본 권장. 명시하지 않으면 deprecation warning이 뜨고, 일부 보안 격리 기능이 비활성화된다.
-
-### 함정 7: 상업적 SaaS 형태로 n8n 호스팅 임대
-
-Sustainable Use License는 "n8n을 제3자에게 서비스로 판매"하는 형태를 금지한다. 클라이언트에게 n8n 인스턴스를 임대해 월 사용료를 받는 비즈니스 모델이라면 n8n과 상업 계약 필요. (워크플로우 구축·컨설팅 자체는 면제)
-
----
-
-## 14. 짝 스킬·관련 자료
-
-| 스킬 | 관계 |
-|------|------|
-| `devops/docker-deployment` | Docker·docker-compose 일반 패턴 (멀티스테이지, 헬스체크 등) |
-| `devops/n8n-workflow-design` | n8n 워크플로우 설계 패턴 (별도 스킬) |
-
-**공식 자료:**
-- Docs: https://docs.n8n.io/hosting/
-- Hosting 예시 레포: https://github.com/n8n-io/n8n-hosting
-- Release notes: https://docs.n8n.io/release-notes/
-- Community: https://community.n8n.io/
-
----
-
-## 15. 빠른 체크리스트 (프로덕션 셀프 호스팅)
-
-설치 전:
-- [ ] PostgreSQL 14+ 사용 결정
-- [ ] `N8N_ENCRYPTION_KEY` 32바이트 이상 랜덤 생성 + 비밀 저장소 백업
-- [ ] 도메인 + DNS A 레코드 준비
-- [ ] HTTPS 방식 결정 (Caddy/Traefik/Cloudflare Tunnel)
-- [ ] 백업 저장소 (S3 등) 준비
-
-설치 직후:
-- [ ] User Management owner 계정 즉시 생성
-- [ ] 2FA 활성화
-- [ ] webhook 노드 Authentication 옵션 검토
-- [ ] 자동 백업 cron 설정 (pg_dump + 워크플로우 export)
-- [ ] `EXECUTIONS_DATA_PRUNE` 활성화 (실행 이력 무한 적재 방지)
-
-운영 중:
-- [ ] 주 1회 docker pull + 업그레이드 (백업 후)
-- [ ] 백업 복구 리허설 분기 1회
-- [ ] 릴리즈 노트 확인 (major 업그레이드 시 breaking changes 점검)
+> 상세 레퍼런스 (예제·고급 패턴·흔한 실수) → [`references/REFERENCE.md`](references/REFERENCE.md)

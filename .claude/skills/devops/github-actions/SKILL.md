@@ -6,10 +6,26 @@ disable-model-invocation: true
 
 # GitHub Actions CI/CD 워크플로우 패턴
 
-> 소스: https://docs.github.com/en/actions
-> 검증일: 2026-04-20
+> 소스:
+> - https://docs.github.com/en/actions
+> - https://github.com/actions/checkout (README·releases)
+> - https://github.blog/changelog/2026-06-18-safer-pull_request_target-defaults-for-github-actions-checkout/
+>
+> 검증일: 2026-09-28 (최초 2026-04-20 · 재검증 08-11, 09-28)
 
-> 주의: 이 문서는 2026-04 기준 GitHub Actions 최신 상태로 작성되었습니다. actions/cache@v4, actions/checkout@v5, dorny/paths-filter@v3, Swatinem/rust-cache@v2 기준입니다.
+> 주의: 이 문서는 2026-09-28 기준 최신 메이저 버전으로 작성되었습니다.
+> `actions/checkout@v7`(7.0.1, 2026-07-20), `actions/cache@v6`(6.1.0), `actions/setup-node@v7`(7.0.0),
+> `actions/upload-artifact@v7`(7.0.1), `actions/download-artifact@v8`(8.0.1), `actions/github-script@v9`(9.0.0),
+> `dorny/paths-filter@v4`(4.0.3), `pnpm/action-setup@v6`(6.1.0), `Swatinem/rust-cache@v2`(2.9.2),
+> `docker/login-action@v4`(4.6.0), `docker/metadata-action@v6`(6.2.0), `docker/build-push-action@v7`(7.4.0),
+> `aws-actions/configure-aws-credentials@v6`(6.3.0), `aws-actions/amazon-ecr-login@v2`(2.1.7),
+> `aws-actions/amazon-ecs-deploy-task-definition@v2`(2.6.3) 기준입니다.
+> **Node 24 런타임 전환 공통 사항 (09-28 확인):** 위 docker/*·aws-actions/configure-aws-credentials 메이저 업(login-action v3→v4, metadata-action v5→v6, build-push-action v6→v7, configure-aws-credentials v4/v5→v6)은 전부 **GitHub Actions Node 24 런타임 전환**이 핵심이며, 표준 입력(`registry`/`username`/`password`, `images`/`tags`, `context`/`push`/`tags`/`cache-from`/`cache-to`, `role-to-assume`/`aws-region`)은 변경되지 않았다. GitHub 호스트 러너는 기본 대응되지만 **셀프호스트 러너는 Actions Runner v2.327.1 이상**이 필요하다. `build-push-action` v7에서 `DOCKER_BUILD_NO_SUMMARY`/`DOCKER_BUILD_EXPORT_RETENTION_DAYS` 환경변수가 제거됐으니 사용 중이면 삭제한다.
+
+> **보안 필독 — actions/checkout v7 기본값 변경 (2026-06-18):** `pull_request_target` 및
+> `workflow_run`(pull_request 계열 이벤트로 트리거된 경우) 워크플로우에서 **포크 PR 코드 체크아웃이 기본 차단**됩니다.
+> 2026-07-20부터 v2~v6 지원 메이저에도 백포트되어, `@v4` 같은 부동(floating) 태그를 쓰는 기존 워크플로우도 영향을 받습니다.
+> 상세는 아래 "포크 PR 보안 — checkout v7 pwn request 차단" 섹션 참조.
 
 ---
 
@@ -33,7 +49,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Build
         run: npm run build
 ```
@@ -145,20 +161,20 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - run: npm run lint
 
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - run: npm test
 
   build:
     needs: [lint, test]  # lint, test 모두 성공 후 실행
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - run: npm run build
 
   deploy:
@@ -216,8 +232,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.experimental || false }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
       - run: npm test
@@ -237,7 +253,7 @@ jobs:
 ```yaml
 - name: Cache node_modules
   id: cache-deps
-  uses: actions/cache@v4
+  uses: actions/cache@v6
   with:
     path: node_modules
     key: ${{ runner.os }}-node-${{ hashFiles('**/pnpm-lock.yaml') }}
@@ -263,17 +279,21 @@ jobs:
 ### setup-node 캐시 (pnpm)
 
 ```yaml
-- uses: pnpm/action-setup@v4
+- uses: pnpm/action-setup@v6
   with:
     version: 9
 
-- uses: actions/setup-node@v4
+- uses: actions/setup-node@v7
   with:
     node-version: 20
     cache: 'pnpm'
 
 - run: pnpm install --frozen-lockfile
 ```
+
+- `pnpm/action-setup@v6`의 `version` 입력은 `package.json`에 `packageManager` 또는 `devEngines.packageManager` 필드가 있으면 생략 가능하고, 없으면 필수다
+- pnpm v11 이상은 공식 문서가 `pnpm/action-setup` 대신 런타임 설치까지 통합한 `pnpm/setup` 사용을 권장한다
+- `actions/setup-node@v7`은 내부가 ESM으로 이관됐고, `registry-url`만 지정하고 `NODE_AUTH_TOKEN`이 없을 때 넣어주던 더미 토큰 폴백이 제거됐다 (Yarn Classic·구형 npm 조합에서 영향)
 
 ### Rust 캐시 (Swatinem/rust-cache)
 
@@ -345,6 +365,60 @@ jobs:
 
 ---
 
+## 포크 PR 보안 — checkout v7 pwn request 차단
+
+`pull_request_target` 워크플로우는 **base 레포의 `GITHUB_TOKEN`·시크릿·기본 브랜치 캐시 스코프**를 가진 채 실행된다.
+여기서 포크 PR의 head 코드를 체크아웃해 실행하면 공격자가 그 권한을 그대로 획득한다 — 전형적인 **pwn request** 취약점이다.
+
+### 무엇이 바뀌었나
+
+`actions/checkout` v7(2026-06-18 GA)부터 **포크 PR 코드 체크아웃이 기본 차단**된다.
+
+| 항목 | 내용 |
+|------|------|
+| 차단 대상 이벤트 | `pull_request_target`, `workflow_run`(단, `workflow_run.event`가 `pull_request*`일 때만) |
+| 차단되는 입력 패턴 | 포크 레포를 가리키는 `repository:`, `refs/pull/<n>/head`·`refs/pull/<n>/merge` 형태의 `ref:`, 포크 PR의 head/merge 커밋 SHA로 해석되는 `ref:` |
+| 영향 없음 | 같은 레포에서 올라온 PR, 일반 `pull_request` 이벤트 |
+| 백포트 | 2026-07-20부터 v2~v6 지원 메이저에 적용 (v1은 제외) |
+| 부동 태그 | `@v4` 등 메이저 태그 사용 시 자동 적용 / SHA·마이너·패치 핀은 미적용이라 별도 업그레이드 필요 |
+| 예외 입력 | `allow-unsafe-pr-checkout` (기본 `false`) |
+
+```yaml
+# 차단됨 (기본값) — 포크 PR 코드를 신뢰 컨텍스트에서 체크아웃
+on: pull_request_target
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}   # ← v7에서 실패
+```
+
+```yaml
+# 권장 — 신뢰 컨텍스트에서는 base 코드만 체크아웃하고,
+# 포크 코드가 필요한 검사는 시크릿 없는 pull_request 워크플로우로 분리
+on: pull_request_target
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7        # ref 미지정 → base 브랜치 체크아웃
+      - run: ./scripts/label.sh          # 포크 코드를 실행하지 않음
+```
+
+**대응 원칙:**
+- 포크 PR 코드를 **빌드·테스트해야 한다면** `pull_request` 이벤트를 쓴다 (시크릿 미전달 + 읽기 전용 토큰)
+- `allow-unsafe-pr-checkout: true`는 최후의 수단이다. 켜야 한다면 시크릿을 잡에서 제거하고, `permissions`를 최소화하고, 승인 필요한 environment 뒤로 격리한 뒤에만 사용한다
+- 액션은 가능하면 커밋 SHA로 핀하되, 핀한 경우 백포트가 자동 적용되지 않으므로 Dependabot 등으로 업그레이드 경로를 유지한다
+
+> 참고: https://gh.io/securely-using-pull_request_target
+
+---
+
 ## Node.js / pnpm 프로젝트 CI
 
 ```yaml
@@ -363,13 +437,13 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 9
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: 'pnpm'

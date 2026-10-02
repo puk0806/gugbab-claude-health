@@ -5,8 +5,9 @@ description: Rsbuild — Rspack 기반 고수준 웹 애플리케이션 빌드 �
 
 # Rsbuild 빌드 툴
 
-> 소스: https://rsbuild.rs | https://github.com/web-infra-dev/rsbuild | https://rslib.rs
-> 검증일: 2026-04-23
+> 소스: https://rsbuild.rs | https://rsbuild.rs/blog/v2-1 | https://github.com/web-infra-dev/rsbuild | https://github.com/web-infra-dev/rsbuild/releases | https://rslib.rs
+> 검증일: 2026-09-28 (최초 2026-04-23, 재검증 2026-08-11)
+> 주의: Rsbuild 2.2는 별도 블로그 글 없이 GitHub Releases 노트로만 공지됐다(공식 블로그는 v2-1까지만 존재, 확인됨). 2.2 신규 기능은 GitHub Releases(2순위 공식 소스)를 근거로 작성했다.
 
 ---
 
@@ -25,12 +26,47 @@ Rsbuild는 ByteDance **web-infra-dev** 팀이 만든 **Rspack 기반 고수준 �
 
 | 항목 | 값 |
 |------|-----|
-| 최신 메이저 | **Rsbuild 2.x** (v2.0.0 릴리즈: 2025-04-22) |
-| 마지막 1.x | v1.7.5 (2025-03-30) — 유지보수 브랜치 |
-| 지원 프레임워크 공식 템플릿 | React, Vue, Svelte, Solid, Preact, Lit, Vanilla |
-| 엔진 | Rspack (Rust 기반, webpack 호환) |
+| 최신 마이너 | **Rsbuild 2.2** (v2.2.0 릴리즈: 2026-08-26) |
+| 최신 patch | v2.2.10 (2026-09-27) |
+| 직전 마이너 | v2.1.0 (2026-06-26) |
+| 직전 메이저 | v2.0.0 (2026-04-22) |
+| 마지막 1.x | v1.7.6 (2026-06-24) — 유지보수 브랜치 |
+| 지원 프레임워크 공식 템플릿 | React, Vue, Svelte, Solid(v2), Preact, Lit, Vanilla |
+| 엔진 | Rspack (Rust 기반, webpack 호환) — 2.2는 @rspack/core 2.2.x 기준 |
 
 > 주의: 프로젝트마다 최신 patch 버전은 `npm view @rsbuild/core version`으로 재확인한다.
+
+---
+
+## Rsbuild 2.1 신규 기능 (2026-06-26)
+
+| 기능 | 내용 | 최소 버전 |
+|------|------|-----------|
+| **Rust 기반 React Compiler** | `pluginReact({ reactCompiler: true })` — Babel 없이 내장 Rust 구현 사용. 컴파일 오버헤드가 Babel 구현 대비 7~13배 빠름 | 2.1.0 |
+| **TanStack Start 지원** | `@tanstack/react-start/plugin/rsbuild`로 SSR·스트리밍 렌더링 지원. Rsbuild가 빌드를 소유하고 프레임워크 플러그인이 client/server 빌드를 연결 | 2.1.0 |
+| **Tailwind CSS v4 플러그인** | `@rsbuild/plugin-tailwindcss` — 공식 `@tailwindcss/webpack` 로더 기반. `@tailwindcss/postcss` 대비 빌드 성능 최대 30% 향상 | 2.1.0 |
+| **`output.autoExternal`** | `package.json`의 dependencies를 읽어 external 규칙 자동 생성 (Node.js/SSR 빌드용) | 2.1.0 |
+| **Babel·SVGR 병렬 처리** | `@rsbuild/plugin-babel`, `@rsbuild/plugin-svgr`가 worker thread 병렬 처리 지원 | 2.1.0 |
+| **CSS `?url` 임포트** | 스타일 자동 주입 없이 컴파일된 CSS 파일 URL만 반환 — 동적 테마 로딩에 유용 | 2.1.0 |
+| **Worker `?worker` 임포트** | `?worker`, `?worker&inline` 쿼리로 Worker 생성자 직접 임포트 | 2.1.0 |
+| **Wasm source 임포트** | Source Phase Imports 제안 지원 — `import source`로 `WebAssembly.Module` 직접 획득 | 2.1.0 |
+
+---
+
+## Rsbuild 2.2 신규 기능 (ADD, 2026-08-26)
+
+> 소스: GitHub Releases (https://github.com/web-infra-dev/rsbuild/releases) — 2.2는 별도 블로그 글이 없어 공식 릴리즈 노트를 근거로 함.
+
+| 기능 | 내용 | 최소 버전 |
+|------|------|-----------|
+| **기본 native watcher** | 파일 변경 감지를 Rust 네이티브 워처로 기본 전환 (chokidar 폴백은 옵션으로 유지) — HMR 반응성 개선 목적 | 2.2.0 |
+| **Node.js 빌드 기본 code-splitting** | `output.target: 'node'` 빌드에서 `splitChunks`가 기본 활성화, `minSize: 0`으로 세분화 | 2.2.0 |
+| **압축 크기 리포팅 확장** | 빌드 후 파일 크기 출력에 **Brotli** 크기 표시 지원 + 커스텀 압축 레벨 지정 가능 (기존엔 gzip만) | 2.2.5 |
+| **`environment.hot.onConnect` API** | HMR 클라이언트 연결 시점 훅 — 커스텀 dev 도구 연동에 사용 | 2.2.8 |
+| **`output.module` (web-worker 타겟)** | web-worker 빌드 타겟에도 ESM 출력(`output.module`) 지원 | 2.2.10 |
+| **Solid v2 지원** | `@rsbuild/plugin-solid`가 Solid v2 대응 + 순수 ESM 패키지로 전환(Rsbuild v1 지원 중단) — Solid 플러그인 사용자에 한해 breaking | 2.2.0 |
+
+> **주의:** 위 항목은 patch 버전까지 GitHub Releases에서 실제 반영 시점을 확인한 결과다(2.2.0/2.2.5/2.2.8/2.2.10 등 세부 버전 표기). 대부분 dev 성능·빌드 산출물 리포팅 개선이며, 이 스킬의 React/CRA 마이그레이션 예시 코드에 영향을 주는 breaking change는 없다(Solid 플러그인 전용 breaking change 제외).
 
 ---
 
@@ -39,6 +75,8 @@ Rsbuild는 ByteDance **web-infra-dev** 팀이 만든 **Rspack 기반 고수준 �
 ```
 무엇을 만드나?
 ├── Next.js 앱  → Next.js (Turbopack/webpack 내장) — Rsbuild 불필요
+├── SSR/풀스택 React (Next.js 외)
+│   └── TanStack Start → Rsbuild ✅ (2.1+ 공식 지원, 아래 "TanStack Start" 참조)
 ├── SPA (React/Vue/Svelte)
 │   ├── 기존 webpack/CRA 프로젝트를 "설정 유지하며" 빠르게 이전 → Rsbuild ✅
 │   ├── 신규 프로젝트, Vite 생태계 선호 → Vite
@@ -204,9 +242,52 @@ export default defineConfig({
 
 > Rsbuild는 SWC로 트랜스파일하므로 **타입 검사를 수행하지 않는다**. `plugin-type-check`가 별도 프로세스로 `tsc --noEmit`을 돌린다.
 
+### 4. React Compiler (Rsbuild 2.1+)
+
+Rsbuild 2.1부터 **Rust 기반 React Compiler**를 `@rsbuild/plugin-react`에서 바로 켤 수 있다. `babel-plugin-react-compiler` 설치가 필요 없고, Babel 구현 대비 컴파일 오버헤드가 7~13배 빠르다.
+
+```typescript
+import { defineConfig } from '@rsbuild/core';
+import { pluginReact } from '@rsbuild/plugin-react';
+
+export default defineConfig({
+  plugins: [
+    pluginReact({
+      reactCompiler: true,
+    }),
+  ],
+});
+```
+
+React 17·18 프로젝트는 `target`을 명시한다:
+
+```typescript
+pluginReact({
+  reactCompiler: {
+    target: '18', // '17' | '18' | '19'
+  },
+});
+```
+
+> Babel 기반 React Compiler 설정도 여전히 동작하지만, 2.1+ 신규 도입 시에는 Rust 경로가 공식 권장이다.
+
+### 5. TanStack Start (Rsbuild 2.1+)
+
+Rsbuild 2.1부터 TanStack Start를 공식 지원한다. Rsbuild가 빌드를 소유하고, 프레임워크 플러그인(`pluginReact`)과 `tanstackStart()`가 client·server 빌드를 함께 연결한다.
+
+```typescript
+import { defineConfig } from '@rsbuild/core';
+import { pluginReact } from '@rsbuild/plugin-react';
+import { tanstackStart } from '@tanstack/react-start/plugin/rsbuild';
+
+export default defineConfig({
+  plugins: [pluginReact(), tanstackStart()],
+});
+```
+
 ---
 
-## SCSS / 환경 변수 / 경로 alias
+## SCSS / Tailwind CSS / 환경 변수 / 경로 alias
 
 ### SCSS
 
@@ -223,6 +304,24 @@ export default defineConfig({
 ```
 
 Less가 필요하면 `@rsbuild/plugin-less`, Stylus는 `@rsbuild/plugin-stylus`.
+
+### Tailwind CSS v4 (Rsbuild 2.1+)
+
+```bash
+npm add -D @rsbuild/plugin-tailwindcss tailwindcss
+```
+
+```typescript
+import { pluginTailwindcss } from '@rsbuild/plugin-tailwindcss';
+
+export default defineConfig({
+  plugins: [pluginReact(), pluginTailwindcss()],
+});
+```
+
+Tailwind CSS 공식 `@tailwindcss/webpack` 로더 기반이라 PostCSS 파이프라인을 거치지 않는다 — `@tailwindcss/postcss` 대비 빌드 성능이 최대 30% 향상된다.
+
+> Tailwind CSS **v3**를 쓴다면 이 플러그인이 아니라 PostCSS 경로(`tailwindcss` + `postcss.config`)를 사용한다.
 
 ### 환경 변수
 

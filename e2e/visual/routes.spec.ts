@@ -163,9 +163,19 @@ test.describe("routes — visual regression", () => {
     });
 
     // settings: 프로필 있음
+    // "앱 설치" 섹션은 브라우저의 beforeinstallprompt 발생 시점에 따라 보였다 안 보였다 한다 —
+    // 이벤트를 직접 발생시켜 섹션이 항상 그려진 상태로 고정한다
     test("settings", async ({ page }) => {
         await seedAndGoto(page, "/settings", { userProfile: SEED_PROFILE });
         await expect(page.getByRole("heading", { name: "성별" })).toBeVisible();
+        await page.evaluate(() => {
+            const e = Object.assign(new Event("beforeinstallprompt", { cancelable: true }), {
+                prompt: () => Promise.resolve(),
+                userChoice: Promise.resolve({ outcome: "dismissed", platform: "" }),
+            });
+            window.dispatchEvent(e);
+        });
+        await expect(page.getByRole("button", { name: "앱 설치" })).toBeVisible();
         await expect(page).toHaveScreenshot("settings.png", { fullPage: true });
     });
 

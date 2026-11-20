@@ -70,7 +70,7 @@ describe("ChatInputBar", () => {
         const props = baseProps();
         render(<ChatInputBar {...props} value="샐러드" />);
 
-        fireEvent.change(screen.getByPlaceholderText("식단을 요청해보세요..."), {
+        fireEvent.change(screen.getByPlaceholderText("식단·운동을 물어보세요..."), {
             target: { value: "샐러드 추천" },
         });
         expect(props.onChange).toHaveBeenCalledWith("샐러드 추천");
@@ -82,7 +82,7 @@ describe("ChatInputBar", () => {
     it("Enter 키로 전송한다", () => {
         const props = baseProps();
         render(<ChatInputBar {...props} value="안녕" />);
-        fireEvent.keyDown(screen.getByPlaceholderText("식단을 요청해보세요..."), { key: "Enter" });
+        fireEvent.keyDown(screen.getByPlaceholderText("식단·운동을 물어보세요..."), { key: "Enter" });
         expect(props.onSend).toHaveBeenCalledTimes(1);
     });
 
@@ -154,7 +154,7 @@ describe("ChatInputBar", () => {
 
     it("disabled(스트리밍 중)면 입력과 마이크가 모두 비활성화된다", () => {
         render(<ChatInputBar {...baseProps()} disabled />);
-        expect(screen.getByPlaceholderText("식단을 요청해보세요...")).toBeDisabled();
+        expect(screen.getByPlaceholderText("식단·운동을 물어보세요...")).toBeDisabled();
         expect(screen.getByRole("button", { name: "음성 입력" })).toBeDisabled();
     });
 });

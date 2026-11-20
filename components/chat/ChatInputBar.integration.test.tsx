@@ -66,7 +66,7 @@ function Harness() {
 }
 
 function input(): HTMLInputElement {
-    return screen.getByPlaceholderText("식단을 요청해보세요...") as HTMLInputElement;
+    return screen.getByPlaceholderText("식단·운동을 물어보세요...") as HTMLInputElement;
 }
 
 function startMic() {

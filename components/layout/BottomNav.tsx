@@ -3,14 +3,15 @@
 import Link from "next/link";
 import styles from "./BottomNav.module.css";
 
-type Tab = "chat" | "ingredients" | "body" | "settings";
+type Tab = "chat" | "workout" | "ingredients" | "body" | "settings";
 
 interface BottomNavProps {
     active: Tab;
 }
 
 const TABS = [
-    { id: "chat" as const, href: "/", icon: "🍽️", label: "식단" },
+    { id: "chat" as const, href: "/", icon: "💬", label: "대화" },
+    { id: "workout" as const, href: "/workout", icon: "🏋️", label: "운동" },
     { id: "ingredients" as const, href: "/ingredients", icon: "🥦", label: "식재료" },
     { id: "body" as const, href: "/body", icon: "📊", label: "지표" },
     { id: "settings" as const, href: "/settings", icon: "⚙️", label: "설정" },

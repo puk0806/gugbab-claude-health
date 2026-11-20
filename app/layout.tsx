@@ -5,12 +5,12 @@ import "./globals.css";
 
 export const metadata: Metadata = {
     title: "gugbab-health",
-    description: "식재료 + 신체 지표 기반 AI 개인화 식단 PWA",
+    description: "식재료·신체 지표·운동 기록 기반 AI 개인화 식단·운동 PWA",
     manifest: "/manifest.json",
     appleWebApp: {
         capable: true,
         statusBarStyle: "black-translucent",
-        title: "건강식단",
+        title: "건강",
     },
     icons: {
         icon: [

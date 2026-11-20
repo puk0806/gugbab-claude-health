@@ -102,3 +102,80 @@ export const SEED_BODY_METRICS: NonNullable<SeedData["bodyMetrics"]> = [
         recordedAt: "2026-06-27T00:00:00.000Z",
     },
 ];
+
+/** 운동 시드 — 앱이 DB를 v4로 올린 뒤(운동 스토어 생성 후) 넣는다 */
+export interface WorkoutSeed {
+    routines: Array<{
+        id: string;
+        name: string;
+        exercises: Array<{ exerciseId: string; sets: number; repMin: number; repMax: number }>;
+        createdAt: string;
+        updatedAt: string;
+    }>;
+    workoutSessions: Array<{
+        id: string;
+        date: string;
+        routineId?: string;
+        routineName?: string;
+        entries: Array<{
+            exerciseId: string;
+            exerciseName: string;
+            targetSets: number;
+            repMin: number;
+            repMax: number;
+            sets: Array<{ weightKg: number; reps: number; done: boolean }>;
+        }>;
+        completedAt: string;
+    }>;
+}
+
+export const SEED_WORKOUT: WorkoutSeed = {
+    routines: [
+        {
+            id: "routine-upper-a",
+            name: "상체 A",
+            exercises: [
+                { exerciseId: "bi-bench-press", sets: 3, repMin: 8, repMax: 12 },
+                { exerciseId: "bi-barbell-row", sets: 3, repMin: 8, repMax: 12 },
+                { exerciseId: "bi-pull-up", sets: 3, repMin: 5, repMax: 8 },
+            ],
+            createdAt: "2026-11-01T00:00:00.000Z",
+            updatedAt: "2026-11-01T00:00:00.000Z",
+        },
+    ],
+    workoutSessions: [
+        {
+            id: "session-001",
+            date: "2026-11-18",
+            routineId: "routine-upper-a",
+            routineName: "상체 A",
+            entries: [
+                {
+                    exerciseId: "bi-bench-press",
+                    exerciseName: "바벨 벤치프레스",
+                    targetSets: 3,
+                    repMin: 8,
+                    repMax: 12,
+                    sets: [
+                        { weightKg: 60, reps: 12, done: true },
+                        { weightKg: 60, reps: 12, done: true },
+                        { weightKg: 60, reps: 12, done: true },
+                    ],
+                },
+                {
+                    exerciseId: "bi-barbell-row",
+                    exerciseName: "바벨 로우",
+                    targetSets: 3,
+                    repMin: 8,
+                    repMax: 12,
+                    sets: [
+                        { weightKg: 50, reps: 10, done: true },
+                        { weightKg: 50, reps: 9, done: true },
+                        { weightKg: 50, reps: 8, done: true },
+                    ],
+                },
+            ],
+            completedAt: "2026-11-18T10:00:00.000Z",
+        },
+    ],
+};

@@ -63,3 +63,16 @@
   color: #15803d;
   cursor: pointer;
 }
+
+.skipBtn {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px;
+  border: none;
+  background: transparent;
+  font-size: 0.8125rem;
+  color: var(--gugbab-color-fg-secondary);
+  text-decoration: underline;
+  cursor: pointer;
+}

@@ -97,7 +97,7 @@ export default function ChatInputBar({
                     value={value}
                     onChange={(e) => onChange(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder="식단을 요청해보세요..."
+                    placeholder="식단·운동을 물어보세요..."
                     disabled={disabled}
                     maxLength={maxLength}
                 />

@@ -88,7 +88,7 @@ export function IosInstallGuide({ onClose }: IosInstallGuideProps) {
                     <li>
                         <span className={styles.stepNum}>4</span>
                         <span className={styles.stepText}>
-                            홈 화면의 <strong>건강식단</strong> 아이콘을 누르면 앱처럼 실행됩니다.
+                            홈 화면의 <strong>건강</strong> 아이콘을 누르면 앱처럼 실행됩니다.
                         </span>
                     </li>
                 </ol>

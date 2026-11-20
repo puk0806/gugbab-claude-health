@@ -1,7 +1,7 @@
 {
-  "name": "건강식단",
-  "short_name": "건강식단",
-  "description": "식재료 + 신체 지표 기반 AI 개인화 식단 PWA",
+  "name": "건강",
+  "short_name": "건강",
+  "description": "식재료·신체 지표·운동 기록 기반 AI 개인화 식단·운동 PWA",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f0fdf4",

@@ -1,6 +1,9 @@
 import { uniq } from "@gugbab/utils";
+import { BUILT_IN_EXERCISES } from "@/lib/training/catalog";
+import { roundWeight } from "@/lib/training/limits";
+import { formatSets } from "@/lib/training/progression";
 import { floor1 } from "./limits";
-import type { UserContext } from "./types";
+import type { NextTargetContext, UserContext, WorkoutContext } from "./types";
 
 /**
  * systemPrompt가 relay 상한(MAX_CUSTOM_PROMPT_CHARS, 20,000자)을 넘지 않도록
@@ -15,7 +18,36 @@ export const PROMPT_CONTEXT_LIMITS = {
     maxMetricDateLength: 32,
     maxRecentMealSummaries: 10,
     maxSummaryLength: 500, // relay 요약 계약(300자 이내)의 여유 상한
+    // 운동 — 최악 케이스에서도 20,000자 안에 들도록 작게 잡는다(context.test 최악 케이스 참고)
+    maxRecentWorkouts: 3,
+    maxWorkoutExercises: 6,
+    maxWorkoutSets: 5,
+    maxNextTargets: 8,
+    // 저장 상한(30자)보다 짧게 — 종목명은 대개 10자 안팎이라 손실이 거의 없다
+    maxExerciseNameLength: 20,
 } as const;
+
+function trimWorkouts(workouts: WorkoutContext[]): WorkoutContext[] {
+    const L = PROMPT_CONTEXT_LIMITS;
+    return workouts.slice(0, L.maxRecentWorkouts).map((w) => ({
+        date: w.date.slice(0, L.maxMetricDateLength),
+        ...(w.routineName ? { routineName: w.routineName.slice(0, L.maxExerciseNameLength) } : {}),
+        exercises: w.exercises.slice(0, L.maxWorkoutExercises).map((e) => ({
+            name: e.name.slice(0, L.maxExerciseNameLength),
+            // 0.25kg 단위로 정리 — 긴 부동소수 직렬화가 길이 상한을 깨지 않게
+            sets: e.sets.slice(0, L.maxWorkoutSets).map((s) => ({ weightKg: roundWeight(s.weightKg), reps: s.reps })),
+        })),
+    }));
+}
+
+function trimNextTargets(targets: NextTargetContext[]): NextTargetContext[] {
+    const L = PROMPT_CONTEXT_LIMITS;
+    return targets.slice(0, L.maxNextTargets).map((t) => ({
+        ...t,
+        name: t.name.slice(0, L.maxExerciseNameLength),
+        ...(t.weightKg !== undefined ? { weightKg: roundWeight(t.weightKg) } : {}),
+    }));
+}
 
 // 소수 1자리 버림 — 앱 입력 정규화(floor1)와 동일 기준.
 // JS 숫자는 직렬화가 최대 24자까지 길어질 수 있어(예: 499.99999999999994)
@@ -42,6 +74,9 @@ export function trimContextForPrompt(ctx: UserContext): UserContext {
         recentMealSummaries: ctx.recentMealSummaries
             .slice(0, L.maxRecentMealSummaries)
             .map((s) => s.slice(0, L.maxSummaryLength)),
+        // 구버전 클라이언트는 운동 필드를 보내지 않는다 — 없으면 없는 그대로 둔다
+        ...(ctx.recentWorkouts ? { recentWorkouts: trimWorkouts(ctx.recentWorkouts) } : {}),
+        ...(ctx.nextTargets ? { nextTargets: trimNextTargets(ctx.nextTargets) } : {}),
     };
 }
 
@@ -59,6 +94,38 @@ const MEAL_PLAN_MODE_GUIDES: Record<string, string> = {
     free: `- 보유 식재료에 얽매이지 말고 목표에 가장 적합한 식단을 자유롭게 추천하세요.
 - 새로 필요한 재료는 "구매 목록"으로 함께 정리해주세요.`,
 };
+
+const NEXT_TARGET_LABELS: Record<NextTargetContext["kind"], string> = {
+    start: "첫 기록 — 하한을 겨우 채울 무게로 시작",
+    increase: "증량",
+    hold: "유지 — 반복 늘리기",
+    deload: "디로드 — 하한 2회 연속 미달",
+};
+
+const BUILT_IN_EXERCISE_NAMES = BUILT_IN_EXERCISES.map((e) => e.name).join(", ");
+
+function workoutsSection(workouts: WorkoutContext[]): string {
+    if (workouts.length === 0) return "기록 없음";
+    return workouts
+        .map((w) => {
+            const head = w.routineName ? `${w.date} ${w.routineName}` : w.date;
+            const body = w.exercises
+                .map((e) => `${e.name} ${formatSets(e.sets.map((s) => ({ ...s, done: true })))}`)
+                .join(" / ");
+            return `- ${head}: ${body}`;
+        })
+        .join("\n");
+}
+
+function nextTargetsSection(targets: NextTargetContext[]): string {
+    if (targets.length === 0) return "없음 (루틴 미등록)";
+    return targets
+        .map((t) => {
+            const weight = t.weightKg === undefined ? "" : t.weightKg === 0 ? " 맨몸" : ` ${t.weightKg}kg`;
+            return `- ${t.name}: ${t.sets}세트 ${t.repMin}~${t.repMax}회${weight} (${NEXT_TARGET_LABELS[t.kind]})`;
+        })
+        .join("\n");
+}
 
 export function buildSystemPrompt(ctx: UserContext): string {
     const gender = ctx.gender === "male" ? "남성" : "여성";
@@ -93,7 +160,10 @@ export function buildSystemPrompt(ctx: UserContext): string {
         ? MEAL_PLAN_MODE_GUIDES[ctx.mealPlanMode]
         : "- 사용자의 현재 식재료로 만들 수 있는 실제 식단을 제안하세요.";
 
-    return `당신은 개인화된 식단 설계 전문가입니다. 사용자의 신체 정보와 보유 식재료를 바탕으로 현실적이고 실천 가능한 식단을 제안합니다.
+    const workouts = ctx.recentWorkouts ?? [];
+    const targets = ctx.nextTargets ?? [];
+
+    return `당신은 개인화된 식단·운동 코치입니다. 사용자의 신체 정보·보유 식재료·운동 기록을 바탕으로 현실적이고 실천 가능한 식단과 운동 루틴을 제안합니다.
 
 ## 사용자 프로필
 ${profileLines.join("\n")}
@@ -107,6 +177,12 @@ ${ingredientsSection}
 ## 최근 식단 이력
 ${mealHistorySection}
 
+## 최근 운동 기록 (최신순, 완료 세트)
+${workoutsSection(workouts)}
+
+## 다음 운동 권장 (앱의 더블 프로그레션 계산)
+${nextTargetsSection(targets)}
+
 ## 대화 지침
 ${mealPlanGuide}
 - 신체 지표 변화 추이를 반영해 목표에 맞는 식단을 설계하세요.
@@ -115,8 +191,15 @@ ${mealPlanGuide}
 - 이전 식단과 최대한 겹치지 않게 제안하세요.
 - 질문은 한 번에 하나만.
 
+## 운동 지침
+- 다음 무게를 물으면 위 "다음 운동 권장"을 그대로 기준으로 삼고 지난 기록을 근거로 짧게 설명하세요. 다른 무게를 권하면 이유를 밝히세요. 기록에 없는 무게를 지어내지 마세요.
+- 규칙: 목표 세트 모두 반복 상한 달성 시 증량(바벨 상체 2.5kg·하체 5kg·덤벨 1~2kg), 하한 2회 연속 미달 시 약 10% 감량, 그 외 같은 무게로 반복 늘리기.
+- 루틴 설계 시 목표별로: 근력 3~6회(1RM 80% 이상)·2~3세트 이상, 근비대 8~12회·부위당 주 약 10세트, 근지구력 15회 이상. 부위별 주 2회 이상. 종목·세트·반복 범위·휴식을 제시하고, 운동 탭 "새 루틴"에서 그대로 만들 수 있게 가능하면 앱 기본 종목명(${BUILT_IN_EXERCISE_NAMES})을 쓰세요.
+- 운동하는 사용자의 단백질은 체중 1kg당 1.4~2.0g(감량 중엔 더 높게)을 기준으로 식단과 연결하세요.
+- 통증·부상을 말하면 해당 운동을 멈추고 전문가 진료를 권하세요.
+
 ## 톤 규약
 - 존댓말, 친근하고 실용적으로
 - 이모지 0~1개
-- 길이: 첫 응답 200~400자, 후속 응답 150~300자 (단, 식단 추천 시 그람수·칼로리 표기가 길이 제한보다 우선 — 표기를 생략하지 말 것)`;
+- 길이: 첫 응답 200~400자, 후속 응답 150~300자 (단, 식단 추천 시 그람수·칼로리 표기, 루틴 설계 시 종목·세트·반복 표기가 길이 제한보다 우선 — 생략하지 말 것)`;
 }

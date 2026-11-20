@@ -1,9 +1,17 @@
 import { uniq } from "@gugbab/utils";
-import { BUILT_IN_EXERCISES } from "@/lib/training/catalog";
+import { BUILT_IN_EXERCISES, EQUIPMENTS, MUSCLE_GROUP_LABELS, MUSCLE_GROUPS } from "@/lib/training/catalog";
 import { roundWeight } from "@/lib/training/limits";
 import { formatSets } from "@/lib/training/progression";
 import { floor1 } from "./limits";
-import type { NextTargetContext, UserContext, WorkoutContext } from "./types";
+import type {
+    ExerciseTrendContext,
+    MuscleVolumeContext,
+    NextTargetContext,
+    RoutineContext,
+    TrendStatus,
+    UserContext,
+    WorkoutContext,
+} from "./types";
 
 /**
  * systemPrompt가 relay 상한(MAX_CUSTOM_PROMPT_CHARS, 20,000자)을 넘지 않도록
@@ -14,7 +22,8 @@ import type { NextTargetContext, UserContext, WorkoutContext } from "./types";
 export const PROMPT_CONTEXT_LIMITS = {
     maxRecentMetrics: 62, // 약 두 달치
     maxIngredients: 120,
-    maxIngredientNameLength: 50,
+    // 50→30: 운동 요약 섹션(추세·루틴·주간 볼륨) 자리를 만들기 위해 줄임. 식재료명은 대개 10자 안팎
+    maxIngredientNameLength: 30,
     maxMetricDateLength: 32,
     maxRecentMealSummaries: 10,
     maxSummaryLength: 500, // relay 요약 계약(300자 이내)의 여유 상한
@@ -25,12 +34,20 @@ export const PROMPT_CONTEXT_LIMITS = {
     maxNextTargets: 8,
     // 저장 상한(30자)보다 짧게 — 종목명은 대개 10자 안팎이라 손실이 거의 없다
     maxExerciseNameLength: 20,
+    // 운동 날짜는 YYYY-MM-DD(10자) — 지표 날짜 상한(32)보다 짧게 잡아 추세 섹션 길이를 줄인다
+    maxWorkoutDateLength: 10,
+    maxExerciseTrends: 6,
+    maxTrendPoints: 4,
+    maxRoutines: 4,
+    maxRoutineExercisesInPrompt: 8,
+    // 주간 세트 수 — 하루 수십 세트를 넘기 어렵다. 직렬화 길이를 고정하기 위한 상한
+    maxWeeklySets: 999,
 } as const;
 
 function trimWorkouts(workouts: WorkoutContext[]): WorkoutContext[] {
     const L = PROMPT_CONTEXT_LIMITS;
     return workouts.slice(0, L.maxRecentWorkouts).map((w) => ({
-        date: w.date.slice(0, L.maxMetricDateLength),
+        date: w.date.slice(0, L.maxWorkoutDateLength),
         ...(w.routineName ? { routineName: w.routineName.slice(0, L.maxExerciseNameLength) } : {}),
         exercises: w.exercises.slice(0, L.maxWorkoutExercises).map((e) => ({
             name: e.name.slice(0, L.maxExerciseNameLength),
@@ -46,6 +63,45 @@ function trimNextTargets(targets: NextTargetContext[]): NextTargetContext[] {
         ...t,
         name: t.name.slice(0, L.maxExerciseNameLength),
         ...(t.weightKg !== undefined ? { weightKg: roundWeight(t.weightKg) } : {}),
+    }));
+}
+
+const TREND_STATUSES: readonly TrendStatus[] = ["rising", "steady", "plateau", "falling", "insufficient"];
+
+function trimWeeklyVolume(volume: MuscleVolumeContext[]): MuscleVolumeContext[] {
+    const L = PROMPT_CONTEXT_LIMITS;
+    // 부위는 enum 6종 — 중복·알 수 없는 값을 버려 enum 종류 수를 자연 상한으로 만든다
+    const seen = new Set<string>();
+    return volume
+        .filter((v) => MUSCLE_GROUPS.includes(v.muscleGroup) && !seen.has(v.muscleGroup) && seen.add(v.muscleGroup))
+        .map((v) => ({
+            muscleGroup: v.muscleGroup,
+            weeklySets: v.weeklySets.slice(0, 4).map((n) => Math.min(L.maxWeeklySets, Math.max(0, Math.floor(n)))),
+        }));
+}
+
+function trimExerciseTrends(trends: ExerciseTrendContext[]): ExerciseTrendContext[] {
+    const L = PROMPT_CONTEXT_LIMITS;
+    return trends
+        .filter((t) => TREND_STATUSES.includes(t.status))
+        .slice(0, L.maxExerciseTrends)
+        .map((t) => ({
+            name: t.name.slice(0, L.maxExerciseNameLength),
+            status: t.status,
+            // 오래된→최신 순이라 뒤쪽(최신)을 보존한다
+            points: t.points.slice(-L.maxTrendPoints).map((p) => ({
+                date: p.date.slice(0, L.maxWorkoutDateLength),
+                weightKg: roundWeight(p.weightKg),
+                reps: p.reps,
+            })),
+        }));
+}
+
+function trimRoutines(routines: RoutineContext[]): RoutineContext[] {
+    const L = PROMPT_CONTEXT_LIMITS;
+    return routines.slice(0, L.maxRoutines).map((r) => ({
+        name: r.name.slice(0, L.maxExerciseNameLength),
+        exercises: r.exercises.slice(0, L.maxRoutineExercisesInPrompt).map((e) => e.slice(0, L.maxExerciseNameLength)),
     }));
 }
 
@@ -77,6 +133,9 @@ export function trimContextForPrompt(ctx: UserContext): UserContext {
         // 구버전 클라이언트는 운동 필드를 보내지 않는다 — 없으면 없는 그대로 둔다
         ...(ctx.recentWorkouts ? { recentWorkouts: trimWorkouts(ctx.recentWorkouts) } : {}),
         ...(ctx.nextTargets ? { nextTargets: trimNextTargets(ctx.nextTargets) } : {}),
+        ...(ctx.weeklyVolume ? { weeklyVolume: trimWeeklyVolume(ctx.weeklyVolume) } : {}),
+        ...(ctx.exerciseTrends ? { exerciseTrends: trimExerciseTrends(ctx.exerciseTrends) } : {}),
+        ...(ctx.routines ? { routines: trimRoutines(ctx.routines) } : {}),
     };
 }
 
@@ -115,6 +174,36 @@ function workoutsSection(workouts: WorkoutContext[]): string {
             return `- ${head}: ${body}`;
         })
         .join("\n");
+}
+
+const TREND_LABELS: Record<TrendStatus, string> = {
+    rising: "상승 — 최근 회차가 최고 기록",
+    steady: "유지",
+    plateau: "정체 — 3회 이상 최고 기록 갱신 없음",
+    falling: "하락 — 최고 대비 10% 이상 낮음",
+    insufficient: "기록 부족(3회 미만)",
+};
+
+function weeklyVolumeSection(volume: MuscleVolumeContext[]): string {
+    if (volume.length === 0 || volume.every((v) => v.weeklySets.every((n) => n === 0))) return "기록 없음";
+    return volume.map((v) => `- ${MUSCLE_GROUP_LABELS[v.muscleGroup]}: ${v.weeklySets.join(" / ")}`).join("\n");
+}
+
+function exerciseTrendsSection(trends: ExerciseTrendContext[]): string {
+    if (trends.length === 0) return "기록 없음";
+    return trends
+        .map((t) => {
+            const points = t.points
+                .map((p) => `${p.date.slice(5)} ${p.weightKg === 0 ? "맨몸" : `${p.weightKg}kg`}×${p.reps}`)
+                .join(" → ");
+            return `- ${t.name} (${TREND_LABELS[t.status]}): ${points}`;
+        })
+        .join("\n");
+}
+
+function routinesSection(routines: RoutineContext[]): string {
+    if (routines.length === 0) return "없음";
+    return routines.map((r) => `- ${r.name}: ${r.exercises.join(", ")}`).join("\n");
 }
 
 function nextTargetsSection(targets: NextTargetContext[]): string {
@@ -162,6 +251,9 @@ export function buildSystemPrompt(ctx: UserContext): string {
 
     const workouts = ctx.recentWorkouts ?? [];
     const targets = ctx.nextTargets ?? [];
+    const volume = ctx.weeklyVolume ?? [];
+    const trends = ctx.exerciseTrends ?? [];
+    const routines = ctx.routines ?? [];
 
     return `당신은 개인화된 식단·운동 코치입니다. 사용자의 신체 정보·보유 식재료·운동 기록을 바탕으로 현실적이고 실천 가능한 식단과 운동 루틴을 제안합니다.
 
@@ -183,6 +275,15 @@ ${workoutsSection(workouts)}
 ## 다음 운동 권장 (앱의 더블 프로그레션 계산)
 ${nextTargetsSection(targets)}
 
+## 현재 루틴 구성
+${routinesSection(routines)}
+
+## 부위별 주간 완료 세트 (최근 7일 / 2주 전 / 3주 전 / 4주 전)
+${weeklyVolumeSection(volume)}
+
+## 종목별 추세 (회차별 최고 세트, 오래된→최신)
+${exerciseTrendsSection(trends)}
+
 ## 대화 지침
 ${mealPlanGuide}
 - 신체 지표 변화 추이를 반영해 목표에 맞는 식단을 설계하세요.
@@ -195,6 +296,11 @@ ${mealPlanGuide}
 - 다음 무게를 물으면 위 "다음 운동 권장"을 그대로 기준으로 삼고 지난 기록을 근거로 짧게 설명하세요. 다른 무게를 권하면 이유를 밝히세요. 기록에 없는 무게를 지어내지 마세요.
 - 규칙: 목표 세트 모두 반복 상한 달성 시 증량(바벨 상체 2.5kg·하체 5kg·덤벨 1~2kg), 하한 2회 연속 미달 시 약 10% 감량, 그 외 같은 무게로 반복 늘리기.
 - 루틴 설계 시 목표별로: 근력 3~6회(1RM 80% 이상)·2~3세트 이상, 근비대 8~12회·부위당 주 약 10세트, 근지구력 15회 이상. 부위별 주 2회 이상. 종목·세트·반복 범위·휴식을 제시하고, 운동 탭 "새 루틴"에서 그대로 만들 수 있게 가능하면 앱 기본 종목명(${BUILT_IN_EXERCISE_NAMES})을 쓰세요.
+- 기록 기반 루틴 조정 시: 주간 세트가 적은 부위는 보강하고 많은 부위는 줄이세요. "정체" 종목은 반복 범위·세트를 바꾸거나 비슷한 종목으로 교체하고, "하락" 종목은 회복(수면·영양·디로드)을 먼저 점검하세요. 위 수치를 근거로 들어 설명하세요.
+- 새 루틴이나 고친 루틴을 제안할 때는 설명 뒤에 루틴마다 아래 형식의 코드 블록을 하나씩 붙이세요. 앱이 "루틴 저장" 버튼으로 바꿔 보여줍니다. 기존 루틴을 고치면 같은 이름을 쓰세요. 종목명은 기본 종목명을 그대로 쓰고, 기본 종목에 없으면 muscleGroup(${MUSCLE_GROUPS.join("|")})과 equipment(${EQUIPMENTS.join("|")})를 함께 넣으세요. 이름 30자, 종목 15개, 세트 1~10, 반복 1~50 이내.
+\`\`\`routine
+{"name":"상체 A","exercises":[{"name":"바벨 벤치프레스","sets":3,"repMin":8,"repMax":12}]}
+\`\`\`
 - 운동하는 사용자의 단백질은 체중 1kg당 1.4~2.0g(감량 중엔 더 높게)을 기준으로 식단과 연결하세요.
 - 통증·부상을 말하면 해당 운동을 멈추고 전문가 진료를 권하세요.
 

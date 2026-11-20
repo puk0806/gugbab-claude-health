@@ -3,11 +3,12 @@
 import { useSSEChat } from "@gugbab/hooks";
 import { capitalize } from "@gugbab/utils";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import ChatInputBar from "@/components/chat/ChatInputBar";
 import ConversationListSheet from "@/components/chat/ConversationListSheet";
 import MealPlanModeSheet from "@/components/chat/MealPlanModeSheet";
 import ModelSheet from "@/components/chat/ModelSheet";
+import RoutineSuggestion from "@/components/chat/RoutineSuggestion";
 import BottomNav from "@/components/layout/BottomNav";
 import { toOutgoingMessages } from "@/lib/ai/history";
 import { BODY_LIMITS, isInRange, MESSAGE_LIMITS, type NumberRange } from "@/lib/ai/limits";
@@ -24,11 +25,12 @@ import {
 import { getAllExercises } from "@/lib/db/exercises";
 import { getAllIngredients } from "@/lib/db/ingredients";
 import { listRoutines } from "@/lib/db/routines";
-import type { ChatMessage, Conversation, MealPlanMode } from "@/lib/db/types";
+import type { ChatMessage, Conversation, Exercise, MealPlanMode, Routine } from "@/lib/db/types";
 import { getUserProfile } from "@/lib/db/userProfile";
 import { listWorkoutSessions } from "@/lib/db/workouts";
 import { useLongPress } from "@/lib/hooks/useLongPress";
 import { buildWorkoutContext } from "@/lib/training/context";
+import { extractRoutineBlocks } from "@/lib/training/routineBlock";
 import styles from "./page.module.css";
 
 const MODEL_STORAGE_KEY = "gugbab-health:model";
@@ -83,6 +85,11 @@ export default function ChatPage() {
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [listOpen, setListOpen] = useState(false);
     const [context, setContext] = useState<UserContext | null>(null);
+    // 대화 속 루틴 제안 카드가 기존 종목·루틴과 대조하는 데 쓴다
+    const [workoutLibrary, setWorkoutLibrary] = useState<{ exercises: Exercise[]; routines: Routine[] }>({
+        exercises: [],
+        routines: [],
+    });
     const [input, setInput] = useState("");
     const [models, setModels] = useState<ModelInfo[] | null>(null);
     const [model, setModel] = useState<string>(loadStoredModel);
@@ -129,6 +136,17 @@ export default function ChatPage() {
         },
         [settleFailedTurn],
     );
+
+    // 대화에서 루틴을 저장하면 다음 질문부터 새 루틴·종목이 컨텍스트에 반영되게 다시 읽는다
+    const refreshWorkoutContext = useCallback(async () => {
+        const [sessions, routines, exercises] = await Promise.all([
+            listWorkoutSessions().catch(() => []),
+            listRoutines().catch(() => []),
+            getAllExercises().catch(() => []),
+        ]);
+        setWorkoutLibrary({ exercises, routines });
+        setContext((prev) => (prev ? { ...prev, ...buildWorkoutContext(sessions, routines, exercises) } : prev));
+    }, []);
 
     const handleDone = useCallback((event?: { type: "done"; summary?: string }) => {
         // relay 계약상 문자열이지만 런타임 방어 — 비문자열·빈 문자열은 없는 것으로 취급 (원문 유지 폴백)
@@ -201,6 +219,7 @@ export default function ChatPage() {
                 // 운동 기록 — 다음 무게를 물으면 앱 계산값을 근거로 답하게 한다
                 ...buildWorkoutContext(sessions, routines, exercises),
             });
+            setWorkoutLibrary({ exercises, routines });
             if (latest) {
                 setConversationId(latest.id);
                 setMessages(latest.messages);
@@ -434,6 +453,8 @@ export default function ChatPage() {
     if (!context) return null;
 
     const streamingText = streaming ? text : "";
+    // 스트리밍 중에도 루틴 블록(JSON)은 감춘다 — 완료 후 카드로 나타난다
+    const streamingVisibleText = streamingText ? extractRoutineBlocks(streamingText).text : "";
 
     return (
         <main className={styles.main}>
@@ -468,18 +489,40 @@ export default function ChatPage() {
                         </p>
                     </div>
                 )}
-                {messages.map((msg, i) => (
-                    <div
+                {messages.map((msg, i) => {
+                    // 답변 속 루틴 블록은 본문에서 떼어 저장 카드로 보인다(복사도 본문만)
+                    const { text: body, drafts } =
+                        msg.role === "assistant"
+                            ? extractRoutineBlocks(msg.content)
+                            : { text: msg.content, drafts: [] };
+                    return (
                         // biome-ignore lint/suspicious/noArrayIndexKey: 메시지는 방 안에서 append-only라 순서가 안정적 (id 없음)
-                        key={i}
-                        className={msg.role === "user" ? styles.userBubble : styles.assistantBubble}
-                        {...bindLongPress(({ x, y }) => setCopyMenu({ content: msg.content, x, y }))}
-                    >
-                        {msg.content}
-                    </div>
-                ))}
-                {streaming && streamingText && <div className={styles.assistantBubble}>{streamingText}</div>}
-                {streaming && !streamingText && (
+                        <Fragment key={i}>
+                            {body && (
+                                <div
+                                    className={msg.role === "user" ? styles.userBubble : styles.assistantBubble}
+                                    {...bindLongPress(({ x, y }) => setCopyMenu({ content: body, x, y }))}
+                                >
+                                    {body}
+                                </div>
+                            )}
+                            {drafts.map((draft, j) => (
+                                <RoutineSuggestion
+                                    // biome-ignore lint/suspicious/noArrayIndexKey: 한 답변 안의 블록 순서는 고정이다
+                                    key={j}
+                                    draft={draft}
+                                    exercises={workoutLibrary.exercises}
+                                    routines={workoutLibrary.routines}
+                                    onSaved={() => void refreshWorkoutContext()}
+                                />
+                            ))}
+                        </Fragment>
+                    );
+                })}
+                {streaming && streamingVisibleText && (
+                    <div className={styles.assistantBubble}>{streamingVisibleText}</div>
+                )}
+                {streaming && !streamingVisibleText && (
                     <div className={styles.typing} role="status" aria-label="입력 중">
                         <span />
                         <span />

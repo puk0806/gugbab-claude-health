@@ -1,4 +1,4 @@
-import type { Gender, Goal } from "@/lib/db/types";
+import type { Gender, Goal, MuscleGroup } from "@/lib/db/types";
 
 // relay API 계약 타입 — 단일 소스는 @gugbab/relay-types (OpenAPI 생성)
 export type { ModelAlias, ModelInfo, ModelsResponse } from "@gugbab/relay-types";
@@ -43,6 +43,27 @@ export interface NextTargetContext {
     repMax: number;
 }
 
+/** 부위별 주간 완료 세트 수 — weeklySets[0]이 최근 7일, [3]이 22~28일 전 */
+export interface MuscleVolumeContext {
+    muscleGroup: MuscleGroup;
+    weeklySets: number[];
+}
+
+export type TrendStatus = "rising" | "steady" | "plateau" | "falling" | "insufficient";
+
+/** 종목별 장기 추세 — 회차별 최고 세트(오래된→최신)와 앱이 판정한 상태 */
+export interface ExerciseTrendContext {
+    name: string;
+    status: TrendStatus;
+    points: { date: string; weightKg: number; reps: number }[];
+}
+
+/** 현재 루틴 구성 — 종목 목표(세트·반복)는 nextTargets에 있다 */
+export interface RoutineContext {
+    name: string;
+    exercises: string[];
+}
+
 export interface UserContext {
     gender: Gender;
     goals: Goal[];
@@ -55,4 +76,7 @@ export interface UserContext {
     /** 최근 운동 세션(최신순) — 구버전 클라이언트 호환을 위해 선택 */
     recentWorkouts?: WorkoutContext[];
     nextTargets?: NextTargetContext[];
+    weeklyVolume?: MuscleVolumeContext[];
+    exerciseTrends?: ExerciseTrendContext[];
+    routines?: RoutineContext[];
 }

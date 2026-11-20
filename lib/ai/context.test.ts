@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { MAX_CUSTOM_PROMPT_CHARS } from "@/lib/relay-limits";
 import { buildSystemPrompt, PROMPT_CONTEXT_LIMITS, trimContextForPrompt } from "./context";
-import type { UserContext } from "./types";
+import type { MuscleVolumeContext, UserContext } from "./types";
 
 const BASE: UserContext = {
     gender: "male",
@@ -187,6 +187,31 @@ describe("trimContextForPrompt", () => {
                 repMin: 50,
                 repMax: 50,
             })),
+            weeklyVolume: Array.from(
+                { length: 50 },
+                (): MuscleVolumeContext => ({
+                    muscleGroup: "shoulders",
+                    weeklySets: Array.from({ length: 20 }, () => 123456.789),
+                }),
+            ).concat(
+                (["chest", "back", "legs", "arms", "core"] as const).map((g) => ({
+                    muscleGroup: g,
+                    weeklySets: [99999, 99999, 99999, 99999],
+                })),
+            ),
+            exerciseTrends: Array.from({ length: 50 }, () => ({
+                name: "가".repeat(100),
+                status: "insufficient" as const,
+                points: Array.from({ length: 30 }, () => ({
+                    date: "가".repeat(100),
+                    weightKg: 499.123456789,
+                    reps: 100,
+                })),
+            })),
+            routines: Array.from({ length: 50 }, () => ({
+                name: "가".repeat(100),
+                exercises: Array.from({ length: 50 }, () => "가".repeat(100)),
+            })),
         };
         const p = buildSystemPrompt(trimContextForPrompt(worst));
         expect(p.length).toBeLessThanOrEqual(MAX_CUSTOM_PROMPT_CHARS);
@@ -228,10 +253,73 @@ describe("운동 컨텍스트", () => {
         expect(p).toContain("식단·운동 코치");
     });
 
+    it("루틴 구성·부위별 주간 세트·종목 추세를 포함한다", () => {
+        const p = buildSystemPrompt({
+            ...BASE,
+            routines: [{ name: "상체 A", exercises: ["바벨 벤치프레스", "바벨 로우"] }],
+            weeklyVolume: [
+                { muscleGroup: "chest", weeklySets: [9, 6, 0, 3] },
+                { muscleGroup: "legs", weeklySets: [0, 0, 0, 0] },
+            ],
+            exerciseTrends: [
+                {
+                    name: "바벨 벤치프레스",
+                    status: "plateau",
+                    points: [
+                        { date: "2026-11-12", weightKg: 60, reps: 10 },
+                        { date: "2026-11-19", weightKg: 60, reps: 9 },
+                    ],
+                },
+                { name: "풀업", status: "rising", points: [{ date: "2026-11-19", weightKg: 0, reps: 8 }] },
+            ],
+        });
+        expect(p).toContain("- 상체 A: 바벨 벤치프레스, 바벨 로우");
+        expect(p).toContain("- 가슴: 9 / 6 / 0 / 3");
+        expect(p).toContain("- 하체: 0 / 0 / 0 / 0");
+        expect(p).toContain("- 바벨 벤치프레스 (정체 — 3회 이상 최고 기록 갱신 없음): 11-12 60kg×10 → 11-19 60kg×9");
+        expect(p).toContain("- 풀업 (상승 — 최근 회차가 최고 기록): 11-19 맨몸×8");
+        // 루틴 저장 블록 형식 안내
+        expect(p).toContain("```routine");
+        expect(p).toContain("muscleGroup(chest|back|shoulders|legs|arms|core)");
+    });
+
     it("운동 필드가 없는 구버전 컨텍스트도 처리한다", () => {
         const p = buildSystemPrompt(trimContextForPrompt(BASE));
         expect(p).toContain("## 최근 운동 기록 (최신순, 완료 세트)\n기록 없음");
         expect(p).toContain("없음 (루틴 미등록)");
+        expect(p).toContain("## 현재 루틴 구성\n없음");
+        expect(p).toContain("## 종목별 추세 (회차별 최고 세트, 오래된→최신)\n기록 없음");
+    });
+
+    it("주간 볼륨·추세·루틴을 상한으로 자르고 알 수 없는 값을 버린다", () => {
+        const L = PROMPT_CONTEXT_LIMITS;
+        const trimmed = trimContextForPrompt({
+            ...BASE,
+            weeklyVolume: [
+                { muscleGroup: "chest", weeklySets: [1.7, -3, 5000, 2, 9] },
+                { muscleGroup: "chest", weeklySets: [1] },
+                { muscleGroup: "neck" as never, weeklySets: [1] },
+            ],
+            exerciseTrends: Array.from({ length: 20 }, (_, i) => ({
+                name: "가".repeat(100),
+                status: i === 0 ? ("moon" as never) : ("steady" as const),
+                points: Array.from({ length: 10 }, (_, j) => ({ date: `2026-11-${10 + j}`, weightKg: 60.1, reps: 10 })),
+            })),
+            routines: Array.from({ length: 10 }, () => ({
+                name: "가".repeat(100),
+                exercises: Array.from({ length: 20 }, () => "나".repeat(100)),
+            })),
+        });
+        expect(trimmed.weeklyVolume).toEqual([{ muscleGroup: "chest", weeklySets: [1, 0, L.maxWeeklySets, 2] }]);
+        expect(trimmed.exerciseTrends).toHaveLength(L.maxExerciseTrends);
+        const points = trimmed.exerciseTrends?.[0]?.points;
+        expect(points).toHaveLength(L.maxTrendPoints);
+        // 최신 회차를 보존한다
+        expect(points?.at(-1)?.date).toBe("2026-11-19");
+        expect(points?.[0]?.weightKg).toBe(60);
+        expect(trimmed.routines).toHaveLength(L.maxRoutines);
+        expect(trimmed.routines?.[0]?.exercises).toHaveLength(L.maxRoutineExercisesInPrompt);
+        expect(trimmed.routines?.[0]?.name.length).toBe(L.maxExerciseNameLength);
     });
 
     it("운동 배열·이름·세트를 상한으로 자르고 무게를 0.25kg 단위로 정리한다", () => {

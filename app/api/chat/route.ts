@@ -6,6 +6,7 @@ import { buildSystemPrompt, trimContextForPrompt } from "@/lib/ai/context";
 import { BODY_LIMITS, MESSAGE_LIMITS } from "@/lib/ai/limits";
 import { OUTGOING_BUDGET_BYTES, RETRY_MAX_MESSAGES } from "@/lib/relay-limits";
 import { WORKOUT_LIMITS } from "@/lib/training/limits";
+import { MAX_WEEKLY_SETS } from "@/lib/training/trends";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -50,6 +51,25 @@ const NextTargetSchema = z.object({
     repMax: RepCountSchema,
 });
 
+const MuscleGroupSchema = z.enum(["chest", "back", "shoulders", "legs", "arms", "core"]);
+
+// 주간 세트 수 — 음수·소수·거대값 거부(직렬화 길이 보장)
+const MuscleVolumeSchema = z.object({
+    muscleGroup: MuscleGroupSchema,
+    weeklySets: z.array(z.number().int().min(0).max(MAX_WEEKLY_SETS)),
+});
+
+const ExerciseTrendSchema = z.object({
+    name: z.string(),
+    status: z.enum(["rising", "steady", "plateau", "falling", "insufficient"]),
+    points: z.array(z.object({ date: z.string(), ...WorkoutSetSchema.shape })),
+});
+
+const RoutineContextSchema = z.object({
+    name: z.string(),
+    exercises: z.array(z.string()),
+});
+
 const UserContextSchema = z.object({
     gender: z.enum(["male", "female"]),
     goals: z.array(z.enum(["lose-weight", "gain-weight", "maintain-weight", "lean-mass", "health"])),
@@ -61,6 +81,9 @@ const UserContextSchema = z.object({
     mealPlanMode: z.enum(["pantry-only", "free"]).optional(),
     recentWorkouts: z.array(WorkoutSchema).optional(),
     nextTargets: z.array(NextTargetSchema).optional(),
+    weeklyVolume: z.array(MuscleVolumeSchema).optional(),
+    exerciseTrends: z.array(ExerciseTrendSchema).optional(),
+    routines: z.array(RoutineContextSchema).optional(),
 });
 
 const ChatRequestSchema = z.object({

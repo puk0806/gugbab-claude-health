@@ -11,9 +11,11 @@ import {
     listConversations,
     saveConversation,
 } from "@/lib/db/conversations";
+import { getAllExercises } from "@/lib/db/exercises";
 import { getAllIngredients } from "@/lib/db/ingredients";
 import type { Conversation } from "@/lib/db/types";
 import { getUserProfile } from "@/lib/db/userProfile";
+import { BUILT_IN_EXERCISES } from "@/lib/training/catalog";
 import ChatPage from "./page";
 
 const { sendMock, abortMock, sseState } = vi.hoisted(() => ({
@@ -188,6 +190,30 @@ describe("ChatPage", () => {
         render(<ChatPage />);
         await waitFor(() => expect(screen.getByText("닭가슴살로 뭐 해먹을까요?")).toBeInTheDocument());
         expect(screen.getByText("닭가슴살 샐러드를 추천드려요.")).toBeInTheDocument();
+    });
+
+    it("답변 속 루틴 블록은 본문에서 숨기고 저장 카드로 보인다(복사도 본문만)", async () => {
+        vi.mocked(getUserProfile).mockResolvedValue(MOCK_PROFILE);
+        vi.mocked(getAllIngredients).mockResolvedValue(PLENTIFUL_INGREDIENTS);
+        const json = '{"name":"상체 A","exercises":[{"name":"바벨 벤치프레스","sets":3,"repMin":8,"repMax":12}]}';
+        vi.mocked(getLatestConversation).mockResolvedValue(
+            makeConversation({
+                messages: [
+                    { role: "user", content: "상체 루틴 짜줘" },
+                    { role: "assistant", content: `상체 루틴이에요.\n\n\`\`\`routine\n${json}\n\`\`\`` },
+                ],
+            }),
+        );
+        vi.mocked(copyToClipboard).mockResolvedValue(true);
+        // 실제 getAllExercises는 기본 종목을 항상 포함한다
+        vi.mocked(getAllExercises).mockResolvedValueOnce([...BUILT_IN_EXERCISES]);
+        render(<ChatPage />);
+        expect(await screen.findByRole("region", { name: "루틴 제안: 상체 A" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "루틴으로 저장" })).toBeInTheDocument();
+        expect(screen.queryByText(/"exercises"/)).not.toBeInTheDocument();
+        fireEvent.contextMenu(screen.getByText("상체 루틴이에요."));
+        fireEvent.click(screen.getByRole("button", { name: "복사" }));
+        await waitFor(() => expect(copyToClipboard).toHaveBeenCalledWith("상체 루틴이에요."));
     });
 
     describe("모델 선택", () => {

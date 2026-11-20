@@ -159,6 +159,46 @@ describe("POST /api/chat (health relay proxy)", () => {
         expect(mockFetch).not.toHaveBeenCalled();
     });
 
+    it("주간 볼륨·종목 추세·루틴 구성을 포함한 컨텍스트를 수용한다", async () => {
+        mockFetch.mockResolvedValueOnce(new Response('data: {"type":"done"}\n\n', { status: 200 }));
+        const { POST } = await import("./route");
+        const res = await POST(
+            makeReq({
+                ...VALID_BODY,
+                context: {
+                    ...VALID_BODY.context,
+                    weeklyVolume: [{ muscleGroup: "chest", weeklySets: [9, 6, 0, 3] }],
+                    exerciseTrends: [
+                        {
+                            name: "바벨 벤치프레스",
+                            status: "plateau",
+                            points: [{ date: "2026-11-01", weightKg: 60, reps: 10 }],
+                        },
+                    ],
+                    routines: [{ name: "상체 A", exercises: ["바벨 벤치프레스", "바벨 로우"] }],
+                },
+            }),
+        );
+        expect(res.status).toBe(200);
+    });
+
+    it.each([
+        ["알 수 없는 부위", { weeklyVolume: [{ muscleGroup: "neck", weeklySets: [1] }] }],
+        ["음수 주간 세트", { weeklyVolume: [{ muscleGroup: "chest", weeklySets: [-1] }] }],
+        ["거대 주간 세트", { weeklyVolume: [{ muscleGroup: "chest", weeklySets: [1e9] }] }],
+        ["알 수 없는 추세", { exerciseTrends: [{ name: "x", status: "moon", points: [] }] }],
+        [
+            "범위 밖 추세 무게",
+            { exerciseTrends: [{ name: "x", status: "steady", points: [{ date: "d", weightKg: 1e308, reps: 5 }] }] },
+        ],
+        ["루틴 종목이 문자열이 아님", { routines: [{ name: "A", exercises: [1] }] }],
+    ])("%s에 400 반환", async (_label, extra) => {
+        const { POST } = await import("./route");
+        const res = await POST(makeReq({ ...VALID_BODY, context: { ...VALID_BODY.context, ...extra } }));
+        expect(res.status).toBe(400);
+        expect(mockFetch).not.toHaveBeenCalled();
+    });
+
     it("잘못된 nextTargets(kind·세트 범위)에 400 반환", async () => {
         const { POST } = await import("./route");
         for (const target of [

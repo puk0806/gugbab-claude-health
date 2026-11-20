@@ -49,6 +49,8 @@ lib/
 │   ├── catalog.ts      # 기본 운동 16종·증량 단위
 │   ├── limits.ts       # 운동 입력 허용 범위 (UI·API 공유)
 │   ├── progression.ts  # 다음 무게 (더블 프로그레션)·추정 1RM (Epley)
+│   ├── trends.ts       # 부위별 주간 세트·종목 추세(상승·유지·정체·하락)
+│   ├── routineBlock.ts # 답변 속 ```routine 블록 파싱·종목 연결
 │   └── context.ts      # 대화용 운동 컨텍스트
 └── db/
     ├── index.ts        # IndexedDB 초기화 (getDB, getLocalDateString)
@@ -58,6 +60,7 @@ lib/
     ├── bodyMetrics.ts  # 신체 지표 CRUD
     ├── exercises.ts    # 운동 종목 (기본 + 사용자 추가)
     ├── routines.ts     # 루틴 CRUD
+    ├── routineDraft.ts # 대화에서 제안된 루틴 저장 (없는 종목 생성)
     ├── workouts.ts     # 운동 세션 기록
     └── conversations.ts # 대화방 CRUD (v2에서 mealHistory 이관)
 ```
@@ -132,14 +135,16 @@ pnpm test:visual      # Playwright 시각 회귀 테스트
 - ✅ Playwright 시각 회귀 8개 스냅샷 (onboarding, ingredients×2, body×2, settings, chat-empty, chat-with-messages)
 - ✅ IndexedDB 시드 헬퍼 (`mealHistory` 지원 추가)
 
-### Phase 5 — 운동 기록 ✅ 1단계 완료
+### Phase 5 — 운동 기록 ✅ 2단계 완료
 
 - ✅ 하단 탭 5개: 대화 · 운동 · 식재료 · 지표 · 설정
 - ✅ 루틴 만들기 (기본 종목 16종 + 직접 추가, 목적별 반복 범위 프리셋)
 - ✅ 세트 기록: 권장 무게 미리 채움, 완료 체크, 새로고침해도 입력 유지
 - ✅ 다음 무게 규칙: 목표 세트 모두 상한 달성 → 증량(바벨 상체 2.5kg·하체 5kg·덤벨 1~2kg), 하한 2회 연속 미달 → 약 10% 디로드, 그 외 유지
 - ✅ 대화에 최근 운동 기록·다음 권장 무게 주입 (루틴 설계 지침 포함)
-- [ ] 대화에서 만든 루틴을 바로 저장, 기록 추이 그래프
+- ✅ 기록 기반 루틴 조정용 요약 주입: 부위별 주간 완료 세트(최근 4주), 종목별 추세(회차별 최고 세트·상승/유지/정체/하락), 현재 루틴 구성
+- ✅ 대화에서 제안한 루틴을 바로 저장: 답변의 ```routine 블록 → "루틴으로 저장" 카드. 같은 이름이면 업데이트/새로 저장 선택, 앱에 없는 종목은 부위·기구가 있으면 새로 만들고 없으면 제외
+- [ ] 기록 추이 그래프
 
 ### Phase 6 — 고도화 (예정)
 
@@ -165,6 +170,7 @@ RELAY_SECRET=...                                  # relay 공유 시크릿 — �
 
 | 날짜 | 내용 |
 |------|------|
+| 2026-11-20 | 운동 기능 2단계: 대화에 부위별 주간 세트·종목 추세·루틴 구성 요약 주입, 대화 속 루틴 저장 카드. 프롬프트 길이 확보를 위해 식재료명 상한 50→30자 |
 | 2026-11-20 | 운동 기능 1단계: 루틴·세트 기록·다음 권장 무게·대화 연동, DB v4(exercises·routines·workoutSessions). 레포 로컬 하네스(.claude/·docs/agents·skills·hooks·memory/·exports/) 제거 — 하네스는 gugbab-claude 래퍼로 일원화 |
 | 2026-06-30 | Phase 3 완료: Gemini AI 채팅, SSE 스트리밍, context 주입, Codex 리뷰 3건 수정 / Phase 4 완료: VRT 8개 스냅샷 (채팅 화면 포함) |
 | 2026-06-27 | Phase 1 완료: 기반 세팅, DB 스키마, 라우팅, 단위 테스트 23개, Codex 리뷰 5건 수정 / Phase 2 완료: 온보딩·식재료·신체지표·설정 실 기능, 단위 테스트 31개 |

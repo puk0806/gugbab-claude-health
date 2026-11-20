@@ -4,12 +4,6 @@ Next.js App Router (TypeScript) — gugbab health 건 앱
 
 ---
 
-## 필수 원칙
-
-- 복잡한 작업 전 계획 확인 → @.claude/rules/task-workflow.md
-
----
-
 ## 금지 사항
 
 - **커밋·푸시는 사용자가 명시적으로 요청할 때만 진행한다. 작업 완료 후 자동 커밋 제안·실행 금지**
@@ -20,19 +14,3 @@ Next.js App Router (TypeScript) — gugbab health 건 앱
 - `use client` 남용 금지 — Server Component 기본, 상호작용 필요한 부분만 클라이언트 컴포넌트
 - `any` 타입 사용 금지 — `unknown` + 타입 가드로 대체
 - `console.log` 프로덕션 코드에 남기지 않기
-
----
-
-## 규칙 참조
-
-| 상황 | 참조 파일 |
-|------|----------|
-| 작업 착수 전 확인 | @.claude/rules/task-workflow.md |
-| Git 커밋 컨벤션 | @.claude/rules/git.md |
-| 외부 정보 조사·검증 | @.claude/rules/info-verification.md |
-| TypeScript 코딩 규칙 | @.claude/rules/typescript.md |
-| 에이전트 설계·작성 | @.claude/rules/agent-design.md |
-| 슬래시 커맨드 작성 | @.claude/rules/commands.md |
-| Codex 적대적 코드 리뷰 | @.claude/rules/codex-review.md |
-| 적대적 테스트 기준 | @.claude/rules/adversarial-testing.md |
-| 메모리 동기화·커밋 전 정리 | @.claude/rules/memory-sync.md |

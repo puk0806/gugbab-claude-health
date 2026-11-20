@@ -44,7 +44,9 @@ jobs:
       github.event_name != 'pull_request' ||
       github.event.action != 'labeled' ||
       github.event.label.name == 'accept-baseline'
-    runs-on: ubuntu-latest
+    # ubuntu-latest가 26.04로 바뀌며 Playwright 1.60이 브라우저 설치를 거부한다.
+    # 베이스라인 PNG도 24.04에서 만들어졌으므로 렌더링 환경을 고정한다
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
 
     steps:

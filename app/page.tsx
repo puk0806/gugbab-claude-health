@@ -24,6 +24,7 @@ import {
 } from "@/lib/db/conversations";
 import { getAllExercises } from "@/lib/db/exercises";
 import { getAllIngredients } from "@/lib/db/ingredients";
+import { clearPendingSnapshot, takePendingSnapshot, writePendingSnapshot } from "@/lib/db/pendingSnapshot";
 import { listRoutines } from "@/lib/db/routines";
 import type { ChatMessage, Conversation, Exercise, MealPlanMode, Routine } from "@/lib/db/types";
 import { getUserProfile } from "@/lib/db/userProfile";
@@ -39,6 +40,50 @@ const ACTIVE_CONVERSATION_KEY = "gugbab-health:conversation";
 const NEW_CONVERSATION_REF = "new";
 const FALLBACK_MODEL = "sonnet";
 const GENERIC_ERROR = "오류가 발생했어요. 잠시 후 다시 시도해주세요.";
+const INTERRUPTED_NOTICE = "이전 응답이 중간에 끊겼어요. 입력창에 질문을 다시 넣어뒀으니 전송을 눌러주세요.";
+
+/** 답을 받지 못한 마지막 질문 — 복원 시 입력창에 다시 채워 사용자가 쓴 내용을 잃지 않게 한다 */
+function unansweredQuestion(messages: ChatMessage[]): string | null {
+    const last = messages.at(-1);
+    return last?.role === "user" && !last.transient ? last.content : null;
+}
+
+/**
+ * 답을 받지 못하고 저장된 마지막 질문(화면 이탈로 스트림이 끊긴 경우)을 복원할 때 처리한다.
+ * 질문은 화면에 남기되 transient로 바꿔 다음 전송·저장에서 빼고(연속 user 턴 방지), 안내 버블을 붙인다
+ */
+function withInterruptedNotice(messages: ChatMessage[]): ChatMessage[] {
+    const last = messages.at(-1);
+    if (last?.role !== "user" || last.transient) return messages;
+    return [
+        ...messages.slice(0, -1),
+        { ...last, transient: true },
+        { role: "assistant", content: INTERRUPTED_NOTICE, transient: true },
+    ];
+}
+
+/**
+ * 지난 실행이 받는 중에 닫혔으면 남긴 사본을 DB로 옮기고 그 방을 돌려준다.
+ * DB에 이미 더 긴(이후에 이어진) 대화가 있으면 사본이 낡은 것이므로 덮어쓰지 않는다
+ */
+async function recoverPendingSnapshot(): Promise<Conversation | undefined> {
+    const snap = takePendingSnapshot();
+    if (!snap) return undefined;
+    try {
+        const existing = snap.id ? await getConversation(snap.id) : undefined;
+        if (existing && existing.messages.length >= snap.messages.length) return undefined;
+        // 사본의 방이 지워졌으면(id는 있는데 DB에 없음) 되살리지 않는다
+        if (snap.id && !existing) return undefined;
+        return await saveConversation({ id: snap.id, messages: snap.messages, mealPlanMode: snap.mealPlanMode });
+    } catch {
+        return undefined;
+    }
+}
+
+/** 받는 중이던 답변 — 받은 본문이 있으면 assistant 턴으로 붙이고, 없으면 질문까지만 */
+function withPartialAnswer(pending: ChatMessage[], partial: string): ChatMessage[] {
+    return partial ? [...pending, { role: "assistant", content: partial }] : pending;
+}
 // 이 개수 미만이면 "보유 재료로만 vs 자유 추천" 선택을 강제한다 (대화방당 1회)
 const SCARCE_INGREDIENT_THRESHOLD = 3;
 // 시스템 프롬프트 "최근 식단 이력"에 넣을 다른 방 요약 최대 개수
@@ -117,6 +162,42 @@ export default function ChatPage() {
     const [roomSummaries, setRoomSummaries] = useState<Array<{ id: string; summary: string }>>([]);
     // 방 전환 세대 — 늦게 끝난 저장 콜백이 이전 방으로 상태를 되돌리는 것 방지
     const roomEpochRef = useRef(0);
+    // 저장 경로(전송 즉시·화면 이탈·완료)가 같은 방을 쓰도록 현재 방 id를 ref로도 유지한다.
+    // 새 방의 첫 저장이 끝나기 전에 다음 저장이 오면 방이 두 개 생기므로 저장은 큐로 직렬화한다
+    const conversationIdRef = useRef<string | null>(null);
+    const saveQueueRef = useRef<Promise<unknown>>(Promise.resolve());
+    // 화면 이탈 시점에 받은 데까지 저장하려면 렌더 밖에서 최신 값을 읽어야 한다
+    const streamTextRef = useRef("");
+    const mealPlanModeRef = useRef<MealPlanMode | null>(null);
+
+    const bindRoom = useCallback((id: string | null) => {
+        conversationIdRef.current = id;
+        setConversationId(id);
+    }, []);
+
+    // 현재 방에 메시지를 저장한다. 방이 바뀌면(세대 변경) 대기 중인 저장은 버린다
+    const persistRoom = useCallback(
+        (msgs: ChatMessage[], mode: MealPlanMode | null) => {
+            const epoch = roomEpochRef.current;
+            const run = saveQueueRef.current.then(async () => {
+                if (roomEpochRef.current !== epoch) return undefined;
+                // transient(에러 안내 버블)는 화면에만 남기고 DB에는 저장하지 않는다
+                const saved = await saveConversation({
+                    id: conversationIdRef.current,
+                    messages: msgs.filter((m) => !m.transient),
+                    mealPlanMode: mode,
+                });
+                // 저장 중 방이 전환됐으면 이전 방으로 재바인딩하지 않는다
+                if (roomEpochRef.current !== epoch) return undefined;
+                bindRoom(saved.id);
+                storeConversationRef(saved.id);
+                return saved;
+            });
+            saveQueueRef.current = run.catch(() => undefined);
+            return run;
+        },
+        [bindRoom],
+    );
 
     // 응답을 받지 못한 요청의 마무리 — 방금 보낸 user 턴을 transient로 전환(화면 유지,
     // 저장·전송 제외)하고 안내 버블을 붙인다. 미응답 질문이 다음 전송 이력에 끼어
@@ -173,6 +254,11 @@ export default function ChatPage() {
             // 저장된 활성 방 참조 복원 — "new"면 빈 새 대화 유지, id면 그 방, 없으면 최근 방
             const ref = loadConversationRef();
             async function restoreConversation() {
+                const recovered = await recoverPendingSnapshot();
+                if (recovered) {
+                    storeConversationRef(recovered.id);
+                    return recovered;
+                }
                 if (ref === NEW_CONVERSATION_REF) return undefined;
                 if (ref) {
                     const found = await getConversation(ref).catch(() => undefined);
@@ -221,15 +307,17 @@ export default function ChatPage() {
             });
             setWorkoutLibrary({ exercises, routines });
             if (latest) {
-                setConversationId(latest.id);
-                setMessages(latest.messages);
+                bindRoom(latest.id);
+                setMessages(withInterruptedNotice(latest.messages));
+                const unanswered = unansweredQuestion(latest.messages);
+                if (unanswered) setInput(unanswered);
                 setMealPlanMode(latest.mealPlanMode ?? null);
                 setModeSkipped(false);
                 setRoomSwitchKey((k) => k + 1);
             }
         }
         init().catch(() => router.replace("/onboarding"));
-    }, [router]);
+    }, [router, bindRoom]);
 
     useEffect(() => {
         let cancelled = false;
@@ -277,22 +365,63 @@ export default function ChatPage() {
         ];
         pendingRef.current = null;
         setMessages(finalMessages);
-        const epoch = roomEpochRef.current;
-        // transient(에러 안내 버블)는 화면에만 남기고 DB에는 저장하지 않는다
-        const persistable = finalMessages.filter((m) => !m.transient);
-        saveConversation({ id: conversationId, messages: persistable, mealPlanMode })
+        persistRoom(finalMessages, mealPlanMode)
             .then((saved) => {
-                // 저장 중 방이 전환됐으면 이전 방으로 재바인딩하지 않는다
-                if (roomEpochRef.current !== epoch) return;
-                setConversationId(saved.id);
-                storeConversationRef(saved.id);
-                if (summary) {
+                // 완료본이 저장됐으면 이전에 남긴 닫힘 사본은 낡은 것 — 다음 실행에 덮어쓰지 않게 지운다
+                if (saved) clearPendingSnapshot();
+                if (saved && summary) {
                     setRoomSummaries((prev) => [{ id: saved.id, summary }, ...prev.filter((r) => r.id !== saved.id)]);
                 }
             })
             .catch(() => undefined);
         inputRef.current?.focus();
-    }, [status, text, conversationId, mealPlanMode, settleFailedTurn]);
+    }, [status, text, mealPlanMode, settleFailedTurn, persistRoom]);
+
+    useEffect(() => {
+        streamTextRef.current = text;
+    }, [text]);
+
+    useEffect(() => {
+        mealPlanModeRef.current = mealPlanMode;
+    }, [mealPlanMode]);
+
+    // 받는 중에 화면을 떠나면 받은 데까지 저장한다.
+    // relay는 본문 뒤에 보이지 않는 요약을 더 만든 뒤 done을 보내므로, 본문이 다 보인 직후
+    // 다른 탭으로 가도 done 전이라 이 경로를 탄다. 요약만 빠지고 본문은 그대로 남는다
+    useEffect(() => {
+        function snapshot() {
+            const pending = pendingRef.current;
+            if (!pending) return;
+            persistRoom(withPartialAnswer(pending, streamTextRef.current), mealPlanModeRef.current).catch(
+                () => undefined,
+            );
+        }
+        // 브라우저 탭 전환·앱 전환 — 스트림은 계속될 수 있으니 대기 상태는 유지하고 사본만 저장
+        function handleVisibility() {
+            if (document.visibilityState === "hidden") snapshot();
+        }
+        document.addEventListener("visibilitychange", handleVisibility);
+        // 새로고침·창 닫기 — IndexedDB 저장은 페이지가 닫히기 전에 끝나지 않을 수 있어
+        // 동기 저장소(localStorage)에도 사본을 남기고 다음 실행 때 DB로 옮긴다
+        function handlePageHide() {
+            const pending = pendingRef.current;
+            if (!pending) return;
+            writePendingSnapshot({
+                id: conversationIdRef.current,
+                messages: withPartialAnswer(pending, streamTextRef.current).filter((m) => !m.transient),
+                mealPlanMode: mealPlanModeRef.current,
+            });
+            snapshot();
+        }
+        window.addEventListener("pagehide", handlePageHide);
+        return () => {
+            document.removeEventListener("visibilitychange", handleVisibility);
+            window.removeEventListener("pagehide", handlePageHide);
+            // 앱 안 탭 이동(언마운트) — useSSEChat이 스트림을 끊으므로 여기서 마지막으로 저장
+            snapshot();
+            pendingRef.current = null;
+        };
+    }, [persistRoom]);
 
     // 하단 근처일 때만 자동 스크롤 — 위로 올려 과거 메시지를 읽는 중에는 방해하지 않는다
     // biome-ignore lint/correctness/useExhaustiveDependencies: messages·text는 새 내용 도착 시점을 잡는 트리거 의존성 (본문은 ref만 읽음)
@@ -336,8 +465,11 @@ export default function ChatPage() {
     }
 
     const ingredientsScarce = context !== null && context.ingredients.length < SCARCE_INGREDIENT_THRESHOLD;
-    // 식재료 부족 시 추천 방식 선택은 강제 — 대화방당 1회, 선택 전에는 전송 불가
-    const needsModeChoice = ingredientsScarce && mealPlanMode === null && !modeSkipped;
+    // 식재료 부족 시 추천 방식 선택은 강제 — 빈 새 대화에서 첫 질문 전에만 묻는다.
+    // 이미 대화가 있는 방(다른 탭에서 돌아오기·새로고침·목록에서 열기)은 창으로 대화를 가리지 않는다.
+    // 방식 없이 진행된 방은 기본 지침(보유 식재료로 만들 수 있는 식단)으로 답한다
+    const roomHasHistory = messages.length > 0;
+    const needsModeChoice = ingredientsScarce && mealPlanMode === null && !modeSkipped && !roomHasHistory;
 
     function handleSend() {
         if (!input.trim() || streaming || !context || needsModeChoice) return;
@@ -346,6 +478,10 @@ export default function ChatPage() {
         const nextMessages = [...messages, userMsg];
         pendingRef.current = nextMessages;
         summaryRef.current = undefined;
+        // 이전 답변 본문이 남아 있으면 이탈 저장이 그걸 이번 답으로 오인한다
+        streamTextRef.current = "";
+        // 질문은 보내는 즉시 저장 — 답을 받기 전에 화면을 떠나도 대화방과 질문이 남는다
+        persistRoom(nextMessages, mealPlanMode).catch(() => undefined);
         // 전송 시에는 위로 올려둔 상태여도 최신 메시지로 따라간다
         nearBottomRef.current = true;
         setShowJumpBtn(false);
@@ -369,7 +505,7 @@ export default function ChatPage() {
         abort();
         pendingRef.current = null;
         roomEpochRef.current += 1;
-        setConversationId(null);
+        bindRoom(null);
         setMessages([]);
         setMealPlanMode(null);
         setModeSkipped(false);
@@ -390,8 +526,10 @@ export default function ChatPage() {
         abort();
         pendingRef.current = null;
         roomEpochRef.current += 1;
-        setConversationId(conversation.id);
-        setMessages(conversation.messages);
+        bindRoom(conversation.id);
+        setMessages(withInterruptedNotice(conversation.messages));
+        const unanswered = unansweredQuestion(conversation.messages);
+        if (unanswered) setInput(unanswered);
         setMealPlanMode(conversation.mealPlanMode ?? null);
         setModeSkipped(false);
         setRoomSwitchKey((k) => k + 1);
@@ -408,6 +546,8 @@ export default function ChatPage() {
             roomEpochRef.current += 1;
         }
         try {
+            // 이미 실행 중인 저장이 삭제 뒤에 끝나면 방이 되살아나므로 먼저 끝나기를 기다린다
+            await saveQueueRef.current;
             await deleteConversation(id);
         } catch {
             return;
@@ -431,12 +571,8 @@ export default function ChatPage() {
         inputRef.current?.focus();
         // 이미 저장된 방이면 선택 즉시 영속화 (새 방은 첫 저장 시 함께 기록)
         // transient(에러 안내 버블)는 확정 저장 경로와 동일하게 제외한다
-        if (conversationId) {
-            saveConversation({
-                id: conversationId,
-                messages: messages.filter((m) => !m.transient),
-                mealPlanMode: mode,
-            }).catch(() => undefined);
+        if (conversationIdRef.current) {
+            persistRoom(messages, mode).catch(() => undefined);
         }
     }
 

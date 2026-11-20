@@ -1,6 +1,15 @@
 import type { DBSchema, IDBPDatabase, IDBPTransaction, StoreNames } from "idb";
 import { openDB } from "idb";
-import type { BodyMetric, Conversation, Ingredient, LegacyMealHistory, UserProfile } from "./types";
+import type {
+    BodyMetric,
+    Conversation,
+    Exercise,
+    Ingredient,
+    LegacyMealHistory,
+    Routine,
+    UserProfile,
+    WorkoutSession,
+} from "./types";
 
 interface HealthDB extends DBSchema {
     userProfile: {
@@ -21,6 +30,20 @@ interface HealthDB extends DBSchema {
         key: string;
         value: Conversation;
         indexes: { byUpdatedAt: string };
+    };
+    exercises: {
+        key: string;
+        value: Exercise;
+    };
+    routines: {
+        key: string;
+        value: Routine;
+        indexes: { byUpdatedAt: string };
+    };
+    workoutSessions: {
+        key: string;
+        value: WorkoutSession;
+        indexes: { byCompletedAt: string };
     };
 }
 
@@ -60,7 +83,7 @@ async function migrateMealHistoryToConversations(
 }
 
 const DB_NAME = "gugbab-health";
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 let dbPromise: Promise<IDBPDatabase<HealthDB>> | null = null;
 
@@ -91,6 +114,21 @@ export function getDB(): Promise<IDBPDatabase<HealthDB>> {
                         keyPath: "id",
                     });
                     convStore.createIndex("byUpdatedAt", "updatedAt");
+                }
+
+                // v3 → v4: 운동 기록 — 사용자 종목·루틴·운동 세션 스토어 추가 (기존 데이터는 그대로)
+                if (!db.objectStoreNames.contains("exercises")) {
+                    db.createObjectStore("exercises", { keyPath: "id" });
+                }
+
+                if (!db.objectStoreNames.contains("routines")) {
+                    const routineStore = db.createObjectStore("routines", { keyPath: "id" });
+                    routineStore.createIndex("byUpdatedAt", "updatedAt");
+                }
+
+                if (!db.objectStoreNames.contains("workoutSessions")) {
+                    const sessionStore = db.createObjectStore("workoutSessions", { keyPath: "id" });
+                    sessionStore.createIndex("byCompletedAt", "completedAt");
                 }
 
                 // v1 → v2: 하루 1건 mealHistory를 대화방으로 이관 후 구 스토어 제거

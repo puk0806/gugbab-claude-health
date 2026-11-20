@@ -1,6 +1,6 @@
 # gugbab-health
 
-식재료 등록 + 신체 지표 기반 AI 개인화 식단 PWA
+식재료 등록 + 신체 지표 + 운동 기록 기반 AI 개인화 식단·운동 PWA
 
 ---
 
@@ -11,7 +11,7 @@
 | 프레임워크 | Next.js 16.2.6 (App Router, TypeScript strict) |
 | PWA | @serwist/next 9.5.11 |
 | 로컬 DB | IndexedDB via `idb` 8.0.3 |
-| AI | Google Gemini (`@google/genai` 1.52.0, `gemini-2.5-flash`) |
+| AI | Claude — gugbab-claude-relay 경유 SSE 프록시 (`@gugbab/relay-types` 계약) |
 | 린트/포맷 | Biome 2.x |
 | 단위 테스트 | vitest 3.x + @testing-library/react + happy-dom |
 | E2E 테스트 | Playwright 1.60.0 (시각 회귀) |
@@ -26,10 +26,14 @@
 app/
 ├── layout.tsx          # 루트 레이아웃 (PWA 메타, viewport-fit=cover)
 ├── page.tsx            # AI 채팅 탭 (홈)
-├── api/chat/           # Gemini 스트리밍 API Route
+├── api/chat/           # relay SSE 프록시 API Route (컨텍스트 검증·시스템 프롬프트 생성)
+├── api/models/         # 사용 가능한 모델 목록
 ├── onboarding/         # 온보딩 (성별·목표 입력)
 ├── ingredients/        # 식재료 등록 탭
 ├── body/               # 신체 지표 탭
+├── workout/            # 운동 탭 (루틴 목록·다음 권장 무게·최근 기록)
+│   ├── routine/        # 루틴 만들기·편집
+│   └── session/        # 세트 기록 (권장 무게 미리 채움, 입력 임시 저장)
 ├── settings/           # 설정 탭
 └── sw.ts               # Service Worker (serwist)
 
@@ -41,13 +45,21 @@ lib/
 ├── ai/
 │   ├── types.ts        # AI 타입 (UserContext, ChatSseEvent)
 │   └── context.ts      # 동적 시스템 프롬프트 생성
+├── training/
+│   ├── catalog.ts      # 기본 운동 16종·증량 단위
+│   ├── limits.ts       # 운동 입력 허용 범위 (UI·API 공유)
+│   ├── progression.ts  # 다음 무게 (더블 프로그레션)·추정 1RM (Epley)
+│   └── context.ts      # 대화용 운동 컨텍스트
 └── db/
     ├── index.ts        # IndexedDB 초기화 (getDB, getLocalDateString)
     ├── types.ts        # DB 타입 정의
     ├── userProfile.ts  # 사용자 프로필 CRUD
     ├── ingredients.ts  # 식재료 CRUD
     ├── bodyMetrics.ts  # 신체 지표 CRUD
-    └── mealHistory.ts  # 식사 기록 CRUD
+    ├── exercises.ts    # 운동 종목 (기본 + 사용자 추가)
+    ├── routines.ts     # 루틴 CRUD
+    ├── workouts.ts     # 운동 세션 기록
+    └── conversations.ts # 대화방 CRUD (v2에서 mealHistory 이관)
 ```
 
 ---
@@ -120,9 +132,17 @@ pnpm test:visual      # Playwright 시각 회귀 테스트
 - ✅ Playwright 시각 회귀 8개 스냅샷 (onboarding, ingredients×2, body×2, settings, chat-empty, chat-with-messages)
 - ✅ IndexedDB 시드 헬퍼 (`mealHistory` 지원 추가)
 
-### Phase 5 — 고도화 (예정)
+### Phase 5 — 운동 기록 ✅ 1단계 완료
 
-- [ ] AI 연동 방식 B: Function Calling (스킬·에이전트를 Gemini tools로 노출)
+- ✅ 하단 탭 5개: 대화 · 운동 · 식재료 · 지표 · 설정
+- ✅ 루틴 만들기 (기본 종목 16종 + 직접 추가, 목적별 반복 범위 프리셋)
+- ✅ 세트 기록: 권장 무게 미리 채움, 완료 체크, 새로고침해도 입력 유지
+- ✅ 다음 무게 규칙: 목표 세트 모두 상한 달성 → 증량(바벨 상체 2.5kg·하체 5kg·덤벨 1~2kg), 하한 2회 연속 미달 → 약 10% 디로드, 그 외 유지
+- ✅ 대화에 최근 운동 기록·다음 권장 무게 주입 (루틴 설계 지침 포함)
+- [ ] 대화에서 만든 루틴을 바로 저장, 기록 추이 그래프
+
+### Phase 6 — 고도화 (예정)
+
 - [ ] 이전 식단 이력 context 주입 (대화 종료 시 summary 생성 → 다음 대화에 포함)
 - [ ] 이전 메뉴 중복 방지 로직
 - [ ] 식재료 유통기한 추적
@@ -134,9 +154,9 @@ pnpm test:visual      # Playwright 시각 회귀 테스트
 ## 환경변수
 
 ```bash
-# .env.local (gitignore됨 — commit 금지)
-GEMINI_API_KEY=AIza...       # Google AI Studio에서 발급
-# GEMINI_MODEL=gemini-2.5-flash  # 선택: 모델 오버라이드
+# .env.local (gitignore됨 — commit 금지, 형식은 .env.example 참고)
+RELAY_URL=https://your-relay-domain.vercel.app   # gugbab-claude-relay 배포 URL
+RELAY_SECRET=...                                  # relay 공유 시크릿 — 서버 전용
 ```
 
 ---
@@ -145,5 +165,6 @@ GEMINI_API_KEY=AIza...       # Google AI Studio에서 발급
 
 | 날짜 | 내용 |
 |------|------|
+| 2026-11-20 | 운동 기능 1단계: 루틴·세트 기록·다음 권장 무게·대화 연동, DB v4(exercises·routines·workoutSessions). 레포 로컬 하네스(.claude/·docs/agents·skills·hooks·memory/·exports/) 제거 — 하네스는 gugbab-claude 래퍼로 일원화 |
 | 2026-06-30 | Phase 3 완료: Gemini AI 채팅, SSE 스트리밍, context 주입, Codex 리뷰 3건 수정 / Phase 4 완료: VRT 8개 스냅샷 (채팅 화면 포함) |
 | 2026-06-27 | Phase 1 완료: 기반 세팅, DB 스키마, 라우팅, 단위 테스트 23개, Codex 리뷰 5건 수정 / Phase 2 완료: 온보딩·식재료·신체지표·설정 실 기능, 단위 테스트 31개 |

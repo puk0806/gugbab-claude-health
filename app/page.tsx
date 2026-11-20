@@ -21,10 +21,14 @@ import {
     listConversations,
     saveConversation,
 } from "@/lib/db/conversations";
+import { getAllExercises } from "@/lib/db/exercises";
 import { getAllIngredients } from "@/lib/db/ingredients";
+import { listRoutines } from "@/lib/db/routines";
 import type { ChatMessage, Conversation, MealPlanMode } from "@/lib/db/types";
 import { getUserProfile } from "@/lib/db/userProfile";
+import { listWorkoutSessions } from "@/lib/db/workouts";
 import { useLongPress } from "@/lib/hooks/useLongPress";
+import { buildWorkoutContext } from "@/lib/training/context";
 import styles from "./page.module.css";
 
 const MODEL_STORAGE_KEY = "gugbab-health:model";
@@ -84,6 +88,8 @@ export default function ChatPage() {
     const [model, setModel] = useState<string>(loadStoredModel);
     const [sheetOpen, setSheetOpen] = useState(false);
     const [mealPlanMode, setMealPlanMode] = useState<MealPlanMode | null>(null);
+    // 이 방에서 식단 방식 선택을 건너뜀(운동 질문 등) — 방을 바꾸면 다시 묻는다
+    const [modeSkipped, setModeSkipped] = useState(false);
     // 롱프레스로 연 복사 메뉴 — null이면 닫힘. 대상 메시지 내용과 표시 좌표를 담는다
     const [copyMenu, setCopyMenu] = useState<{ content: string; x: number; y: number } | null>(null);
     const [toast, setToast] = useState<string | null>(null);
@@ -158,11 +164,14 @@ export default function ChatPage() {
             }
 
             // 프로필 확인 후 추가 DB 읽기 — 실패해도 온보딩으로 보내지 않고 빈 값으로 처리
-            const [ingredients, metrics, latest, allConversations] = await Promise.all([
+            const [ingredients, metrics, latest, allConversations, sessions, routines, exercises] = await Promise.all([
                 getAllIngredients().catch(() => []),
                 getLatestBodyMetrics(7).catch(() => []),
                 restoreConversation(),
                 listConversations().catch(() => []),
+                listWorkoutSessions().catch(() => []),
+                listRoutines().catch(() => []),
+                getAllExercises().catch(() => []),
             ]);
             // 방별 마지막 답변 요약 수집 (목록은 최근 수정순)
             setRoomSummaries(
@@ -189,11 +198,14 @@ export default function ChatPage() {
                     })),
                 ingredients: ingredients.map((i) => ({ name: i.name })),
                 recentMealSummaries: [],
+                // 운동 기록 — 다음 무게를 물으면 앱 계산값을 근거로 답하게 한다
+                ...buildWorkoutContext(sessions, routines, exercises),
             });
             if (latest) {
                 setConversationId(latest.id);
                 setMessages(latest.messages);
                 setMealPlanMode(latest.mealPlanMode ?? null);
+                setModeSkipped(false);
                 setRoomSwitchKey((k) => k + 1);
             }
         }
@@ -306,7 +318,7 @@ export default function ChatPage() {
 
     const ingredientsScarce = context !== null && context.ingredients.length < SCARCE_INGREDIENT_THRESHOLD;
     // 식재료 부족 시 추천 방식 선택은 강제 — 대화방당 1회, 선택 전에는 전송 불가
-    const needsModeChoice = ingredientsScarce && mealPlanMode === null;
+    const needsModeChoice = ingredientsScarce && mealPlanMode === null && !modeSkipped;
 
     function handleSend() {
         if (!input.trim() || streaming || !context || needsModeChoice) return;
@@ -341,6 +353,7 @@ export default function ChatPage() {
         setConversationId(null);
         setMessages([]);
         setMealPlanMode(null);
+        setModeSkipped(false);
         setRoomSwitchKey((k) => k + 1);
         storeConversationRef(NEW_CONVERSATION_REF);
     }
@@ -361,6 +374,7 @@ export default function ChatPage() {
         setConversationId(conversation.id);
         setMessages(conversation.messages);
         setMealPlanMode(conversation.mealPlanMode ?? null);
+        setModeSkipped(false);
         setRoomSwitchKey((k) => k + 1);
         storeConversationRef(conversation.id);
         setListOpen(false);
@@ -385,6 +399,11 @@ export default function ChatPage() {
             // 현재 열려 있던 방을 지우면 새 대화 상태로 초기화
             handleNewChat();
         }
+    }
+
+    function handleSkipMode() {
+        setModeSkipped(true);
+        inputRef.current?.focus();
     }
 
     function handleSelectMode(mode: MealPlanMode) {
@@ -423,7 +442,7 @@ export default function ChatPage() {
                     <button type="button" className={styles.listBtn} onClick={handleOpenList} aria-label="대화 목록">
                         ☰
                     </button>
-                    <span className={styles.headerTitle}>식단 채팅</span>
+                    <span className={styles.headerTitle}>식단·운동</span>
                     <button
                         type="button"
                         className={styles.modelChip}
@@ -443,9 +462,9 @@ export default function ChatPage() {
                 {messages.length === 0 && !streaming && (
                     <div className={styles.empty}>
                         <p>
-                            안녕하세요! 오늘 어떤 식단을 원하시나요?
+                            안녕하세요! 오늘 어떤 식단이나 운동이 궁금하세요?
                             <br />
-                            보유한 식재료와 신체 지표를 바탕으로 추천해드릴게요.
+                            보유 식재료·신체 지표·운동 기록을 바탕으로 알려드릴게요.
                         </p>
                     </div>
                 )}
@@ -500,7 +519,7 @@ export default function ChatPage() {
                 />
             )}
 
-            {needsModeChoice && <MealPlanModeSheet onSelect={handleSelectMode} />}
+            {needsModeChoice && <MealPlanModeSheet onSelect={handleSelectMode} onSkip={handleSkipMode} />}
 
             <ChatInputBar
                 value={input}

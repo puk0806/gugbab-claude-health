@@ -39,6 +39,33 @@ describe("MealPlanModeSheet", () => {
         expect(last).toHaveFocus();
     });
 
+    it("건너뛰기가 있으면 세 버튼을 순서대로 순환하고, 누르면 onSkip 호출", () => {
+        const onSkip = vi.fn();
+        render(<MealPlanModeSheet onSelect={vi.fn()} onSkip={onSkip} />);
+        const dialog = screen.getByRole("dialog", { name: "추천 방식 선택" });
+        const first = screen.getByRole("button", { name: "보유 재료로만" });
+        const second = screen.getByRole("button", { name: "자유롭게 추천" });
+        const skip = screen.getByRole("button", { name: "식단 말고 운동만 물어볼게요" });
+
+        expect(first).toHaveFocus();
+        fireEvent.keyDown(dialog, { key: "Tab" });
+        expect(second).toHaveFocus();
+        fireEvent.keyDown(dialog, { key: "Tab" });
+        expect(skip).toHaveFocus();
+        fireEvent.keyDown(dialog, { key: "Tab" });
+        expect(first).toHaveFocus();
+        fireEvent.keyDown(dialog, { key: "Tab", shiftKey: true });
+        expect(skip).toHaveFocus();
+
+        fireEvent.click(skip);
+        expect(onSkip).toHaveBeenCalledTimes(1);
+    });
+
+    it("onSkip이 없으면 건너뛰기 버튼을 그리지 않는다", () => {
+        render(<MealPlanModeSheet onSelect={vi.fn()} />);
+        expect(screen.queryByRole("button", { name: /운동만/ })).not.toBeInTheDocument();
+    });
+
     it("선택 강제 — 백드롭 클릭·ESC로 닫히지 않는다", () => {
         const onSelect = vi.fn();
         render(<MealPlanModeSheet onSelect={onSelect} />);

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { buildSystemPrompt, trimContextForPrompt } from "@/lib/ai/context";
 import { BODY_LIMITS, MESSAGE_LIMITS } from "@/lib/ai/limits";
 import { OUTGOING_BUDGET_BYTES, RETRY_MAX_MESSAGES } from "@/lib/relay-limits";
+import { WORKOUT_LIMITS } from "@/lib/training/limits";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -26,6 +27,29 @@ const IngredientSchema = z.object({
     name: z.string(),
 });
 
+// 운동 숫자도 WORKOUT_LIMITS로 고정 — 기록 UI·진행 규칙과 같은 범위
+const WorkoutSetSchema = z.object({
+    weightKg: z.number().min(WORKOUT_LIMITS.weightKg.min).max(WORKOUT_LIMITS.weightKg.max),
+    reps: z.number().int().min(1).max(WORKOUT_LIMITS.reps.max),
+});
+
+const WorkoutSchema = z.object({
+    date: z.string(),
+    routineName: z.string().optional(),
+    exercises: z.array(z.object({ name: z.string(), sets: z.array(WorkoutSetSchema) })),
+});
+
+const RepCountSchema = z.number().int().min(WORKOUT_LIMITS.repRange.min).max(WORKOUT_LIMITS.repRange.max);
+
+const NextTargetSchema = z.object({
+    name: z.string(),
+    kind: z.enum(["start", "increase", "hold", "deload"]),
+    weightKg: z.number().min(WORKOUT_LIMITS.weightKg.min).max(WORKOUT_LIMITS.weightKg.max).optional(),
+    sets: z.number().int().min(WORKOUT_LIMITS.sets.min).max(WORKOUT_LIMITS.sets.max),
+    repMin: RepCountSchema,
+    repMax: RepCountSchema,
+});
+
 const UserContextSchema = z.object({
     gender: z.enum(["male", "female"]),
     goals: z.array(z.enum(["lose-weight", "gain-weight", "maintain-weight", "lean-mass", "health"])),
@@ -35,6 +59,8 @@ const UserContextSchema = z.object({
     ingredients: z.array(IngredientSchema),
     recentMealSummaries: z.array(z.string()),
     mealPlanMode: z.enum(["pantry-only", "free"]).optional(),
+    recentWorkouts: z.array(WorkoutSchema).optional(),
+    nextTargets: z.array(NextTargetSchema).optional(),
 });
 
 const ChatRequestSchema = z.object({

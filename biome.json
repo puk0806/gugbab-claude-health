@@ -14,7 +14,6 @@
       "!pnpm-lock.yaml",
       "!**/.claude",
       "!**/docs",
-      "!**/memory",
       "!e2e/visual/__screenshots__",
       "!e2e/visual/__diff_archive__",
       "!public/**",

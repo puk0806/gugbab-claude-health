@@ -38,6 +38,16 @@ vi.mock("@/lib/db/bodyMetrics", () => ({
     getLatestBodyMetrics: vi.fn(),
 }));
 
+vi.mock("@/lib/db/workouts", () => ({
+    listWorkoutSessions: vi.fn().mockResolvedValue([]),
+    historyByExercise: vi.fn().mockReturnValue(new Map()),
+}));
+vi.mock("@/lib/db/routines", () => ({
+    listRoutines: vi.fn().mockResolvedValue([]),
+}));
+vi.mock("@/lib/db/exercises", () => ({
+    getAllExercises: vi.fn().mockResolvedValue([]),
+}));
 vi.mock("@/lib/db/conversations", () => ({
     getConversation: vi.fn(),
     getLatestConversation: vi.fn(),
@@ -162,7 +172,7 @@ describe("ChatPage", () => {
     it("프로필 있으면 입력창·전송 버튼 표시", async () => {
         vi.mocked(getUserProfile).mockResolvedValue(MOCK_PROFILE);
         render(<ChatPage />);
-        await waitFor(() => expect(screen.getByPlaceholderText("식단을 요청해보세요...")).toBeInTheDocument());
+        await waitFor(() => expect(screen.getByPlaceholderText("식단·운동을 물어보세요...")).toBeInTheDocument());
         expect(screen.getByRole("button", { name: "전송" })).toBeInTheDocument();
     });
 
@@ -225,7 +235,7 @@ describe("ChatPage", () => {
 
         it("전송 시 선택된 모델 alias를 포함해 send를 호출한다", async () => {
             await renderAndWaitChip();
-            fireEvent.change(screen.getByPlaceholderText("식단을 요청해보세요..."), {
+            fireEvent.change(screen.getByPlaceholderText("식단·운동을 물어보세요..."), {
                 target: { value: "저녁 추천해줘" },
             });
             fireEvent.click(screen.getByRole("button", { name: "전송" }));
@@ -244,7 +254,7 @@ describe("ChatPage", () => {
                 sseState.status = "done";
             });
             await renderAndWaitChip();
-            fireEvent.change(screen.getByPlaceholderText("식단을 요청해보세요..."), {
+            fireEvent.change(screen.getByPlaceholderText("식단·운동을 물어보세요..."), {
                 target: { value: "저녁 추천해줘" },
             });
             fireEvent.click(screen.getByRole("button", { name: "전송" }));
@@ -263,27 +273,27 @@ describe("ChatPage", () => {
         it("스트리밍 중에는 모델 칩이 비활성화된다", async () => {
             sseState.status = "streaming";
             render(<ChatPage />);
-            await waitFor(() => screen.getByPlaceholderText("식단을 요청해보세요..."));
+            await waitFor(() => screen.getByPlaceholderText("식단·운동을 물어보세요..."));
             expect(screen.getByRole("button", { name: /Sonnet/ })).toBeDisabled();
         });
 
         it("모델 목록 로드 실패 시 칩은 중립 라벨로 비활성, 채팅 입력은 가능", async () => {
             mockFetch.mockRejectedValue(new Error("network down"));
             render(<ChatPage />);
-            await waitFor(() => screen.getByPlaceholderText("식단을 요청해보세요..."));
+            await waitFor(() => screen.getByPlaceholderText("식단·운동을 물어보세요..."));
             // 실제 사용될 모델(relay 기본값)을 알 수 없으므로 특정 모델명을 표시하지 않는다
             expect(screen.queryByRole("button", { name: /Sonnet/ })).not.toBeInTheDocument();
             expect(screen.getByRole("button", { name: /모델/ })).toBeDisabled();
-            expect(screen.getByPlaceholderText("식단을 요청해보세요...")).toBeEnabled();
+            expect(screen.getByPlaceholderText("식단·운동을 물어보세요...")).toBeEnabled();
         });
 
         it("모델 목록 로드 실패 시 검증 안 된 model은 전송하지 않는다", async () => {
             window.localStorage.setItem("gugbab-health:model", "removed-model");
             mockFetch.mockRejectedValue(new Error("network down"));
             render(<ChatPage />);
-            await waitFor(() => screen.getByPlaceholderText("식단을 요청해보세요..."));
+            await waitFor(() => screen.getByPlaceholderText("식단·운동을 물어보세요..."));
 
-            fireEvent.change(screen.getByPlaceholderText("식단을 요청해보세요..."), {
+            fireEvent.change(screen.getByPlaceholderText("식단·운동을 물어보세요..."), {
                 target: { value: "저녁 추천해줘" },
             });
             fireEvent.click(screen.getByRole("button", { name: "전송" }));
@@ -302,7 +312,7 @@ describe("ChatPage", () => {
 
         async function renderAndWaitInput() {
             render(<ChatPage />);
-            await waitFor(() => screen.getByPlaceholderText("식단을 요청해보세요..."));
+            await waitFor(() => screen.getByPlaceholderText("식단·운동을 물어보세요..."));
         }
 
         it("새 대화 시 스트림 중단 + 화면 초기화 (기존 방은 보존)", async () => {
@@ -314,7 +324,7 @@ describe("ChatPage", () => {
 
             expect(abortMock).toHaveBeenCalled();
             expect(screen.queryByText("닭가슴살 샐러드를 추천드려요.")).not.toBeInTheDocument();
-            expect(screen.getByText(/안녕하세요! 오늘 어떤 식단을/)).toBeInTheDocument();
+            expect(screen.getByText(/안녕하세요! 오늘 어떤 식단이나 운동이/)).toBeInTheDocument();
             // 새 대화는 삭제·저장을 하지 않는다 — 기존 방은 목록에 남는다
             expect(deleteConversation).not.toHaveBeenCalled();
             expect(saveConversation).not.toHaveBeenCalled();
@@ -376,7 +386,7 @@ describe("ChatPage", () => {
             });
             await renderAndWaitInput();
 
-            fireEvent.change(screen.getByPlaceholderText("식단을 요청해보세요..."), {
+            fireEvent.change(screen.getByPlaceholderText("식단·운동을 물어보세요..."), {
                 target: { value: "저녁 추천" },
             });
             fireEvent.click(screen.getByRole("button", { name: "전송" }));
@@ -411,7 +421,7 @@ describe("ChatPage", () => {
             await renderAndWaitInput();
             await waitFor(() => screen.getByText("닭가슴살 샐러드를 추천드려요."));
 
-            fireEvent.change(screen.getByPlaceholderText("식단을 요청해보세요..."), {
+            fireEvent.change(screen.getByPlaceholderText("식단·운동을 물어보세요..."), {
                 target: { value: "한 끼 더" },
             });
             fireEvent.click(screen.getByRole("button", { name: "전송" }));
@@ -449,7 +459,7 @@ describe("ChatPage", () => {
             vi.mocked(getLatestConversation).mockResolvedValue(makeConversation());
             await renderAndWaitInput();
 
-            expect(screen.getByText(/안녕하세요! 오늘 어떤 식단을/)).toBeInTheDocument();
+            expect(screen.getByText(/안녕하세요! 오늘 어떤 식단이나 운동이/)).toBeInTheDocument();
             expect(screen.queryByText("닭가슴살 샐러드를 추천드려요.")).not.toBeInTheDocument();
         });
 
@@ -465,7 +475,7 @@ describe("ChatPage", () => {
             fireEvent.click(screen.getByRole("button", { name: `${current.title} 삭제` }));
 
             await waitFor(() => expect(screen.queryByText("닭가슴살 샐러드를 추천드려요.")).not.toBeInTheDocument());
-            expect(screen.getByText(/안녕하세요! 오늘 어떤 식단을/)).toBeInTheDocument();
+            expect(screen.getByText(/안녕하세요! 오늘 어떤 식단이나 운동이/)).toBeInTheDocument();
         });
     });
 
@@ -478,11 +488,11 @@ describe("ChatPage", () => {
 
         async function renderAndWaitInput() {
             render(<ChatPage />);
-            await waitFor(() => screen.getByPlaceholderText("식단을 요청해보세요..."));
+            await waitFor(() => screen.getByPlaceholderText("식단·운동을 물어보세요..."));
         }
 
         function typeAndSend(text: string) {
-            fireEvent.change(screen.getByPlaceholderText("식단을 요청해보세요..."), {
+            fireEvent.change(screen.getByPlaceholderText("식단·운동을 물어보세요..."), {
                 target: { value: text },
             });
             fireEvent.click(screen.getByRole("button", { name: "전송" }));
@@ -515,6 +525,20 @@ describe("ChatPage", () => {
             expect(body.context.mealPlanMode).toBe("free");
         });
 
+        it("운동만 물어보기를 고르면 방식 없이 전송되고, 새 대화에서는 다시 묻는다", async () => {
+            await renderAndWaitInput();
+            fireEvent.click(screen.getByRole("button", { name: "식단 말고 운동만 물어볼게요" }));
+            expect(screen.queryByText(/어떻게 추천해드릴까요/)).not.toBeInTheDocument();
+            typeAndSend("다음 벤치 몇 kg?");
+
+            expect(sendMock).toHaveBeenCalledTimes(1);
+            const body = sendMock.mock.calls[0][0] as { context: { mealPlanMode?: string } };
+            expect(body.context.mealPlanMode).toBeUndefined();
+
+            fireEvent.click(screen.getByRole("button", { name: "새 대화" }));
+            expect(screen.getByText(/어떻게 추천해드릴까요/)).toBeInTheDocument();
+        });
+
         it("모드가 저장된 대화방에서는 다시 묻지 않는다", async () => {
             vi.mocked(getLatestConversation).mockResolvedValue(makeConversation({ mealPlanMode: "free" }));
             await renderAndWaitInput();
@@ -542,7 +566,7 @@ describe("ChatPage", () => {
         it("모드 선택 후 입력창으로 포커스를 되돌린다", async () => {
             await renderAndWaitInput();
             fireEvent.click(screen.getByRole("button", { name: "보유 재료로만" }));
-            expect(screen.getByPlaceholderText("식단을 요청해보세요...")).toHaveFocus();
+            expect(screen.getByPlaceholderText("식단·운동을 물어보세요...")).toHaveFocus();
         });
 
         it("식재료가 풍부하면 배너 없이 바로 전송 가능하다", async () => {

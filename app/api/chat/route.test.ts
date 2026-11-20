@@ -121,6 +121,58 @@ describe("POST /api/chat (health relay proxy)", () => {
         expect(res.status).toBe(200);
     });
 
+    it("운동 기록·다음 권장을 포함한 컨텍스트를 수용한다", async () => {
+        mockFetch.mockResolvedValueOnce(new Response('data: {"type":"done"}\n\n', { status: 200 }));
+        const { POST } = await import("./route");
+        const res = await POST(
+            makeReq({
+                ...VALID_BODY,
+                context: {
+                    ...VALID_BODY.context,
+                    recentWorkouts: [
+                        {
+                            date: "2026-11-18",
+                            routineName: "상체 A",
+                            exercises: [{ name: "바벨 벤치프레스", sets: [{ weightKg: 60, reps: 12 }] }],
+                        },
+                    ],
+                    nextTargets: [
+                        { name: "바벨 벤치프레스", kind: "increase", weightKg: 62.5, sets: 3, repMin: 8, repMax: 12 },
+                    ],
+                },
+            }),
+        );
+        expect(res.status).toBe(200);
+    });
+
+    it.each([
+        ["범위 밖 운동 무게(1e308)", { exercises: [{ name: "x", sets: [{ weightKg: 1e308, reps: 5 }] }] }],
+        ["음수 무게", { exercises: [{ name: "x", sets: [{ weightKg: -1, reps: 5 }] }] }],
+        ["소수 반복", { exercises: [{ name: "x", sets: [{ weightKg: 60, reps: 5.5 }] }] }],
+        ["0회 반복", { exercises: [{ name: "x", sets: [{ weightKg: 60, reps: 0 }] }] }],
+    ])("%s 운동 기록에 400 반환", async (_label, workout) => {
+        const { POST } = await import("./route");
+        const res = await POST(
+            makeReq({ ...VALID_BODY, context: { ...VALID_BODY.context, recentWorkouts: [{ date: "d", ...workout }] } }),
+        );
+        expect(res.status).toBe(400);
+        expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("잘못된 nextTargets(kind·세트 범위)에 400 반환", async () => {
+        const { POST } = await import("./route");
+        for (const target of [
+            { name: "x", kind: "max-out", sets: 3, repMin: 8, repMax: 12 },
+            { name: "x", kind: "hold", sets: 99, repMin: 8, repMax: 12 },
+            { name: "x", kind: "hold", sets: 3, repMin: 0, repMax: 12 },
+        ]) {
+            const res = await POST(
+                makeReq({ ...VALID_BODY, context: { ...VALID_BODY.context, nextTargets: [target] } }),
+            );
+            expect(res.status).toBe(400);
+        }
+    });
+
     it("범위 밖 heightCm(30)에 400 반환", async () => {
         const { POST } = await import("./route");
         const res = await POST(makeReq({ ...VALID_BODY, context: { ...VALID_BODY.context, heightCm: 30 } }));

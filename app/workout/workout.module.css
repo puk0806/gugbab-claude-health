@@ -1,0 +1,310 @@
+.main {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding-bottom: calc(80px + env(safe-area-inset-bottom));
+  gap: 8px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: calc(20px + env(safe-area-inset-top)) 20px 8px;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--gugbab-color-fg-primary);
+}
+
+.backLink {
+  font-size: 1.25rem;
+  text-decoration: none;
+  color: var(--gugbab-color-fg-secondary);
+  padding: 4px 8px 4px 0;
+}
+
+.section {
+  padding: 16px 20px;
+  background: var(--gugbab-color-bg-surface);
+  margin: 0 16px;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--gugbab-color-fg-primary);
+}
+
+.empty {
+  color: var(--gugbab-color-fg-secondary);
+  font-size: 0.875rem;
+  margin: 0;
+  text-align: center;
+  padding: 12px 0;
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--gugbab-color-fg-secondary);
+  line-height: 1.5;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--gugbab-color-border-subtle);
+  border-radius: 12px;
+  background: var(--gugbab-color-bg-app);
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--gugbab-color-fg-primary);
+  overflow-wrap: anywhere;
+}
+
+.cardSub {
+  font-size: 0.8125rem;
+  color: var(--gugbab-color-fg-secondary);
+}
+
+.exerciseLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  font-size: 0.875rem;
+  color: var(--gugbab-color-fg-primary);
+}
+
+.exerciseName {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--gugbab-color-bg-surface);
+  color: var(--gugbab-color-fg-secondary);
+  border: 1px solid var(--gugbab-color-border-subtle);
+}
+
+.badge[data-kind="increase"] {
+  color: #15803d;
+  border-color: #22c55e;
+}
+
+.badge[data-kind="deload"] {
+  color: #b45309;
+  border-color: #f59e0b;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.primaryBtn,
+.secondaryBtn,
+.dangerBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  border: none;
+}
+
+.primaryBtn {
+  background: #22c55e;
+  color: #fff;
+}
+
+.secondaryBtn {
+  background: transparent;
+  color: var(--gugbab-color-fg-primary);
+  border: 1.5px solid var(--gugbab-color-border-subtle);
+}
+
+.dangerBtn {
+  background: transparent;
+  color: var(--gugbab-color-danger-base, #e5484d);
+  border: 1.5px solid var(--gugbab-color-danger-base, #e5484d);
+}
+
+.primaryBtn:disabled,
+.secondaryBtn:disabled,
+.dangerBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.grow {
+  flex: 1;
+}
+
+.label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--gugbab-color-fg-secondary);
+}
+
+.input,
+.select {
+  padding: 10px 12px;
+  border: 1.5px solid var(--gugbab-color-border-subtle);
+  border-radius: 10px;
+  background: var(--gugbab-color-bg-app);
+  color: var(--gugbab-color-fg-primary);
+  /* 16px 미만이면 iOS가 포커스 시 화면을 자동 확대함 */
+  font-size: 1rem;
+  min-width: 0;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.row > * {
+  flex: 1;
+  min-width: 0;
+}
+
+.fieldError {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--gugbab-color-danger-base, #e5484d);
+}
+
+.iconBtn {
+  padding: 4px 8px;
+  border: none;
+  background: transparent;
+  font-size: 0.875rem;
+  cursor: pointer;
+  color: var(--gugbab-color-fg-muted);
+  flex-shrink: 0;
+}
+
+.setTable {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.setRow {
+  display: grid;
+  grid-template-columns: 28px 1fr 1fr 64px;
+  gap: 8px;
+  align-items: center;
+}
+
+.setHead {
+  font-size: 0.75rem;
+  color: var(--gugbab-color-fg-secondary);
+}
+
+.setIndex {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--gugbab-color-fg-secondary);
+  text-align: center;
+}
+
+.doneBtn {
+  padding: 10px 0;
+  border-radius: 10px;
+  border: 1.5px solid var(--gugbab-color-border-subtle);
+  background: transparent;
+  color: var(--gugbab-color-fg-secondary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.doneBtn[aria-pressed="true"] {
+  background: #22c55e;
+  border-color: #22c55e;
+  color: #fff;
+}
+
+.doneBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.stickyBar {
+  position: sticky;
+  bottom: calc(72px + env(safe-area-inset-bottom));
+  margin: 0 16px;
+  display: flex;
+}
+
+.stickyBar > button {
+  flex: 1;
+  padding: 14px;
+  font-size: 1rem;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 15%);
+}
+
+.inset {
+  margin: 0 20px;
+}
+
+/* 떠 있는 버튼은 비활성이어도 불투명하게 — 아래 내용이 비쳐 겹쳐 보이지 않도록 */
+.stickyBar > button:disabled {
+  opacity: 1;
+  background: var(--gugbab-color-bg-surface);
+  color: var(--gugbab-color-fg-secondary);
+  border: 1.5px solid var(--gugbab-color-border-subtle);
+}

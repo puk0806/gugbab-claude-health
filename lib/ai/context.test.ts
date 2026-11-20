@@ -170,8 +170,97 @@ describe("trimContextForPrompt", () => {
                 "가".repeat(L.maxSummaryLength),
             ),
             mealPlanMode: "pantry-only",
+            // 운동도 상한을 크게 넘겨 넣는다 — 절삭이 상한을 보장하는지 확인
+            recentWorkouts: Array.from({ length: 50 }, () => ({
+                date: "가".repeat(100),
+                routineName: "가".repeat(100),
+                exercises: Array.from({ length: 50 }, () => ({
+                    name: "가".repeat(100),
+                    sets: Array.from({ length: 30 }, (_, i) => ({ weightKg: 499.123456789 - i, reps: 100 })),
+                })),
+            })),
+            nextTargets: Array.from({ length: 50 }, () => ({
+                name: "가".repeat(100),
+                kind: "deload" as const,
+                weightKg: 499.333333,
+                sets: 10,
+                repMin: 50,
+                repMax: 50,
+            })),
         };
         const p = buildSystemPrompt(trimContextForPrompt(worst));
         expect(p.length).toBeLessThanOrEqual(MAX_CUSTOM_PROMPT_CHARS);
+    });
+});
+
+describe("운동 컨텍스트", () => {
+    const WITH_WORKOUT: UserContext = {
+        ...BASE,
+        recentWorkouts: [
+            {
+                date: "2026-11-18",
+                routineName: "상체 A",
+                exercises: [
+                    {
+                        name: "바벨 벤치프레스",
+                        sets: [
+                            { weightKg: 60, reps: 12 },
+                            { weightKg: 60, reps: 12 },
+                            { weightKg: 60, reps: 12 },
+                        ],
+                    },
+                ],
+            },
+        ],
+        nextTargets: [
+            { name: "바벨 벤치프레스", kind: "increase", weightKg: 62.5, sets: 3, repMin: 8, repMax: 12 },
+            { name: "풀업", kind: "start", sets: 3, repMin: 5, repMax: 8 },
+            { name: "푸시업", kind: "hold", weightKg: 0, sets: 3, repMin: 10, repMax: 20 },
+        ],
+    };
+
+    it("최근 운동 기록과 다음 권장 무게를 포함한다", () => {
+        const p = buildSystemPrompt(WITH_WORKOUT);
+        expect(p).toContain("2026-11-18 상체 A: 바벨 벤치프레스 60kg×12, 12, 12");
+        expect(p).toContain("바벨 벤치프레스: 3세트 8~12회 62.5kg (증량)");
+        expect(p).toContain("풀업: 3세트 5~8회 (첫 기록");
+        expect(p).toContain("푸시업: 3세트 10~20회 맨몸 (유지");
+        expect(p).toContain("식단·운동 코치");
+    });
+
+    it("운동 필드가 없는 구버전 컨텍스트도 처리한다", () => {
+        const p = buildSystemPrompt(trimContextForPrompt(BASE));
+        expect(p).toContain("## 최근 운동 기록 (최신순, 완료 세트)\n기록 없음");
+        expect(p).toContain("없음 (루틴 미등록)");
+    });
+
+    it("운동 배열·이름·세트를 상한으로 자르고 무게를 0.25kg 단위로 정리한다", () => {
+        const L = PROMPT_CONTEXT_LIMITS;
+        const trimmed = trimContextForPrompt({
+            ...BASE,
+            recentWorkouts: Array.from({ length: 10 }, () => ({
+                date: "2026-11-18",
+                exercises: Array.from({ length: 20 }, () => ({
+                    name: "가".repeat(100),
+                    sets: Array.from({ length: 20 }, () => ({ weightKg: 60.1234567, reps: 10 })),
+                })),
+            })),
+            nextTargets: Array.from({ length: 30 }, () => ({
+                name: "가".repeat(100),
+                kind: "hold" as const,
+                weightKg: 61.111111,
+                sets: 3,
+                repMin: 8,
+                repMax: 12,
+            })),
+        });
+        expect(trimmed.recentWorkouts).toHaveLength(L.maxRecentWorkouts);
+        const ex = trimmed.recentWorkouts?.[0]?.exercises;
+        expect(ex).toHaveLength(L.maxWorkoutExercises);
+        expect(ex?.[0]?.name.length).toBe(L.maxExerciseNameLength);
+        expect(ex?.[0]?.sets).toHaveLength(L.maxWorkoutSets);
+        expect(ex?.[0]?.sets[0]?.weightKg).toBe(60);
+        expect(trimmed.nextTargets).toHaveLength(L.maxNextTargets);
+        expect(trimmed.nextTargets?.[0]?.weightKg).toBe(61);
     });
 });

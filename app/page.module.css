@@ -168,6 +168,34 @@
   }
 }
 
+/* 받는 도중 끊겨 일부만 저장된 답변 아래 안내 */
+.interruptedNote {
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: -4px;
+  padding-left: 4px;
+  font-size: 0.8125rem;
+  color: var(--gugbab-color-fg-secondary);
+}
+
+.retryBtn {
+  padding: 4px 10px;
+  border: 1.5px solid var(--gugbab-color-border-subtle);
+  border-radius: 100px;
+  background: transparent;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--gugbab-color-fg-primary);
+  cursor: pointer;
+}
+
+.retryBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .typing {
   align-self: flex-start;
   display: flex;

@@ -34,6 +34,8 @@ export interface ChatMessage {
     summary?: string;
     /** UI 전용 임시 메시지(에러 안내 버블 등) — DB 저장·relay 전송에서 제외 */
     transient?: boolean;
+    /** 받는 도중 화면 이탈로 끊겨 일부만 저장된 답변 (assistant 전용) — 끊김 표시·다시 묻기 버튼 */
+    interrupted?: boolean;
 }
 
 export type MealPlanMode = "pantry-only" | "free";

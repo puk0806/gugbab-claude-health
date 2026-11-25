@@ -87,5 +87,31 @@ describe("pendingSnapshot", () => {
             expect(snap?.messages).toEqual([{ role: "user", content: "a" }]);
             expect(({} as Record<string, unknown>).polluted).toBeUndefined();
         });
+
+        it("정상: 답변의 끊김 표시(interrupted)는 그대로 옮긴다", () => {
+            const messages = [
+                { role: "user", content: "운동 추천해줘" },
+                { role: "assistant", content: "스쿼트", interrupted: true },
+            ];
+            expect(parsePendingSnapshot(JSON.stringify({ ...VALID, messages }))?.messages).toEqual(messages);
+        });
+
+        it("변조: 끊김 표시가 참/거짓이 아니면(문자열·객체) 사본 전체를 거부한다", () => {
+            for (const interrupted of ["true", 1, { x: 1 }, null]) {
+                const messages = [{ role: "assistant", content: "a", interrupted }];
+                expect(parsePendingSnapshot(JSON.stringify({ ...VALID, messages }))).toBeNull();
+            }
+        });
+
+        it("경계: 질문에 붙은 끊김 표시·false 값은 버린다", () => {
+            const messages = [
+                { role: "user", content: "q", interrupted: true },
+                { role: "assistant", content: "a", interrupted: false },
+            ];
+            expect(parsePendingSnapshot(JSON.stringify({ ...VALID, messages }))?.messages).toEqual([
+                { role: "user", content: "q" },
+                { role: "assistant", content: "a" },
+            ]);
+        });
     });
 });

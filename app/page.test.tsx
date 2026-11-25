@@ -99,6 +99,9 @@ const MODELS_RESPONSE = {
     default: "sonnet",
 };
 
+// 받는 도중 이탈로 일부만 저장된 답변 아래 안내 문구
+const INTERRUPTED_LABEL = "답변을 끝까지 받기 전에 화면을 벗어났어요";
+
 const PLENTIFUL_INGREDIENTS = [
     { id: "i1", name: "닭가슴살", addedAt: "" },
     { id: "i2", name: "브로콜리", addedAt: "" },
@@ -534,7 +537,11 @@ describe("ChatPage", () => {
                         id: "conv-new",
                         messages: [
                             { role: "user", content: "운동 추천해줘" },
-                            { role: "assistant", content: "스쿼트 3세트 8~12회, 40kg로 시작하세요." },
+                            {
+                                role: "assistant",
+                                content: "스쿼트 3세트 8~12회, 40kg로 시작하세요.",
+                                interrupted: true,
+                            },
                         ],
                     }),
                 );
@@ -574,6 +581,7 @@ describe("ChatPage", () => {
                 expect(vi.mocked(saveConversation).mock.calls[1][0].messages.at(-1)).toEqual({
                     role: "assistant",
                     content: "부분 답변",
+                    interrupted: true,
                 });
             });
 
@@ -592,6 +600,7 @@ describe("ChatPage", () => {
                 expect(vi.mocked(saveConversation).mock.calls[1][0].messages.at(-1)).toEqual({
                     role: "assistant",
                     content: "새로고침 직전 본문",
+                    interrupted: true,
                 });
             });
 
@@ -619,7 +628,7 @@ describe("ChatPage", () => {
                     id: "conv-new",
                     messages: [
                         { role: "user", content: "운동 추천해줘" },
-                        { role: "assistant", content: "닫히기 직전 본문" },
+                        { role: "assistant", content: "닫히기 직전 본문", interrupted: true },
                     ],
                     mealPlanMode: null,
                 });
@@ -785,6 +794,168 @@ describe("ChatPage", () => {
                 await renderAndWaitInput();
                 await screen.findByText("닭가슴살 샐러드를 추천드려요.");
                 expect(screen.queryByText(/이전 응답이 중간에 끊겼어요/)).not.toBeInTheDocument();
+            });
+
+            describe("일부만 저장된(끊긴) 답변", () => {
+                const interruptedRoom = () =>
+                    makeConversation({
+                        messages: [
+                            { role: "user", content: "첫 질문" },
+                            { role: "assistant", content: "첫 답변" },
+                            { role: "user", content: "운동 추천해줘" },
+                            { role: "assistant", content: "다이어트 목적이시면 스쿼트", interrupted: true },
+                        ],
+                    });
+
+                it("끊김 표시와 다시 묻기 버튼을 보인다", async () => {
+                    vi.mocked(getLatestConversation).mockResolvedValue(interruptedRoom());
+                    await renderAndWaitInput();
+                    expect(await screen.findByText("다이어트 목적이시면 스쿼트")).toBeInTheDocument();
+                    expect(screen.getByText(INTERRUPTED_LABEL)).toBeInTheDocument();
+                    expect(screen.getByRole("button", { name: "다시 묻기" })).toBeEnabled();
+                });
+
+                it("본문이 다 온 뒤 done 전에 앱 안 탭 이동(언마운트)해도 끊김으로 저장하고, 문구는 잘렸다고 단정하지 않는다", async () => {
+                    sendMock.mockImplementation(() => {
+                        // 본문 전부 수신, 숨은 요약 생성 중(done 전)
+                        sseState.text = "스쿼트 40kg 3×10, 벤치 30kg 3×10. 끝.";
+                        sseState.status = "streaming";
+                    });
+                    const { unmount } = render(<ChatPage />);
+                    await waitFor(() => screen.getByPlaceholderText("식단·운동을 물어보세요..."));
+                    typeAndSend("운동 추천해줘");
+                    await waitFor(() => expect(saveConversation).toHaveBeenCalledTimes(1));
+                    unmount();
+                    await waitFor(() => expect(saveConversation).toHaveBeenCalledTimes(2));
+                    const saved = vi.mocked(saveConversation).mock.calls[1][0].messages;
+                    expect(saved.at(-1)).toEqual({
+                        role: "assistant",
+                        content: "스쿼트 40kg 3×10, 벤치 30kg 3×10. 끝.",
+                        interrupted: true,
+                    });
+
+                    // 돌아오면 본문은 그대로, 문구는 "끝까지 받기 전에 벗어났다"
+                    sendMock.mockReset();
+                    sseState.status = "idle";
+                    sseState.text = "";
+                    vi.mocked(getLatestConversation).mockResolvedValue(makeConversation({ messages: saved }));
+                    await renderAndWaitInput();
+                    expect(await screen.findByText("스쿼트 40kg 3×10, 벤치 30kg 3×10. 끝.")).toBeInTheDocument();
+                    expect(screen.getByText(INTERRUPTED_LABEL)).toBeInTheDocument();
+                    expect(screen.queryByText(/중간에 끊겼어요/)).not.toBeInTheDocument();
+                });
+
+                it("다시 묻기는 끊긴 질문·답변 쌍을 빼고 같은 질문을 다시 보낸다", async () => {
+                    vi.mocked(getLatestConversation).mockResolvedValue(interruptedRoom());
+                    await renderAndWaitInput();
+                    fireEvent.click(await screen.findByRole("button", { name: "다시 묻기" }));
+
+                    const body = sendMock.mock.calls[0][0] as { messages: Array<{ role: string; content: string }> };
+                    expect(body.messages).toEqual([
+                        { role: "user", content: "첫 질문" },
+                        { role: "assistant", content: "첫 답변" },
+                        { role: "user", content: "운동 추천해줘" },
+                    ]);
+                    // 잘린 답변은 이력·저장에서 빠진다
+                    await waitFor(() =>
+                        expect(saveConversation).toHaveBeenCalledWith(
+                            expect.objectContaining({
+                                id: "conv-1",
+                                messages: [
+                                    { role: "user", content: "첫 질문" },
+                                    { role: "assistant", content: "첫 답변" },
+                                    { role: "user", content: "운동 추천해줘" },
+                                ],
+                            }),
+                        ),
+                    );
+                    expect(screen.queryByText("다이어트 목적이시면 스쿼트")).not.toBeInTheDocument();
+                });
+
+                it("다시 묻기가 입력창에 쓰던 글을 지우지 않는다", async () => {
+                    vi.mocked(getLatestConversation).mockResolvedValue(interruptedRoom());
+                    await renderAndWaitInput();
+                    fireEvent.change(screen.getByPlaceholderText("식단·운동을 물어보세요..."), {
+                        target: { value: "쓰던 글" },
+                    });
+                    fireEvent.click(await screen.findByRole("button", { name: "다시 묻기" }));
+                    expect(screen.getByPlaceholderText("식단·운동을 물어보세요...")).toHaveValue("쓰던 글");
+                });
+
+                it("악성: 다시 묻기를 연타해도 한 번만 보낸다", async () => {
+                    vi.mocked(getLatestConversation).mockResolvedValue(interruptedRoom());
+                    await renderAndWaitInput();
+                    const btn = await screen.findByRole("button", { name: "다시 묻기" });
+                    fireEvent.click(btn);
+                    fireEvent.click(btn);
+                    fireEvent.click(btn);
+                    expect(sendMock).toHaveBeenCalledTimes(1);
+                });
+
+                it("받는 중에는 다시 묻기가 눌리지 않는다", async () => {
+                    vi.mocked(getLatestConversation).mockResolvedValue(interruptedRoom());
+                    sseState.status = "streaming";
+                    await renderAndWaitInput();
+                    expect(await screen.findByRole("button", { name: "다시 묻기" })).toBeDisabled();
+                });
+
+                it("끊긴 답변 뒤로 대화가 이어졌으면 표시만 남기고 다시 묻기는 없다", async () => {
+                    vi.mocked(getLatestConversation).mockResolvedValue(
+                        makeConversation({
+                            messages: [
+                                { role: "user", content: "운동 추천해줘" },
+                                { role: "assistant", content: "잘린 답", interrupted: true },
+                                { role: "user", content: "이어서 질문" },
+                                { role: "assistant", content: "이어진 답" },
+                            ],
+                        }),
+                    );
+                    await renderAndWaitInput();
+                    await screen.findByText("이어진 답");
+                    expect(screen.getByText(INTERRUPTED_LABEL)).toBeInTheDocument();
+                    expect(screen.queryByRole("button", { name: "다시 묻기" })).not.toBeInTheDocument();
+                });
+
+                it("경계: 마크다운 기호만 받은 조각(**)은 답변으로 저장하지 않는다", async () => {
+                    sendMock.mockImplementation(() => {
+                        sseState.text = "** \n- ";
+                        sseState.status = "streaming";
+                    });
+                    const { unmount } = render(<ChatPage />);
+                    await waitFor(() => screen.getByPlaceholderText("식단·운동을 물어보세요..."));
+                    typeAndSend("운동 추천해줘");
+                    await waitFor(() => expect(saveConversation).toHaveBeenCalledTimes(1));
+                    unmount();
+
+                    await waitFor(() => expect(saveConversation).toHaveBeenCalledTimes(2));
+                    expect(vi.mocked(saveConversation).mock.calls[1][0].messages).toEqual([
+                        { role: "user", content: "운동 추천해줘" },
+                    ]);
+                });
+
+                it("정상 완료된 답변에는 끊김 표시가 붙지 않는다(탭을 숨겼다 돌아와도)", async () => {
+                    sendMock.mockImplementation(() => {
+                        sseState.text = "부분";
+                        sseState.status = "streaming";
+                    });
+                    const { rerender } = render(<ChatPage />);
+                    await waitFor(() => screen.getByPlaceholderText("식단·운동을 물어보세요..."));
+                    typeAndSend("운동 추천해줘");
+                    const spy = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+                    document.dispatchEvent(new Event("visibilitychange"));
+                    spy.mockRestore();
+                    await waitFor(() => expect(saveConversation).toHaveBeenCalledTimes(2));
+
+                    sseState.text = "완료된 전체 답변";
+                    sseState.status = "done";
+                    rerender(<ChatPage />);
+
+                    await screen.findByText("완료된 전체 답변");
+                    await waitFor(() => expect(saveConversation).toHaveBeenCalledTimes(3));
+                    const finalMsgs = vi.mocked(saveConversation).mock.calls[2][0].messages;
+                    expect(finalMsgs.at(-1)).toEqual({ role: "assistant", content: "완료된 전체 답변" });
+                    expect(screen.queryByText(INTERRUPTED_LABEL)).not.toBeInTheDocument();
+                });
             });
 
             it("빈 대화방(메시지 0개)도 깨지지 않고 빈 화면으로 복원한다", async () => {

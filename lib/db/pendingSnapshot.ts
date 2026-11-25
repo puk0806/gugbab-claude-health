@@ -21,13 +21,14 @@ const MAX_SNAPSHOT_MESSAGES = 200;
 
 function isChatMessage(value: unknown): value is ChatMessage {
     if (!isPlainObject(value)) return false;
-    const { role, content, summary } = value;
+    const { role, content, summary, interrupted } = value;
     return (
         (role === "user" || role === "assistant") &&
         typeof content === "string" &&
         content.length > 0 &&
         content.length <= MESSAGE_LIMITS.maxContentLength * 4 &&
-        (summary === undefined || typeof summary === "string")
+        (summary === undefined || typeof summary === "string") &&
+        (interrupted === undefined || typeof interrupted === "boolean")
     );
 }
 
@@ -52,6 +53,8 @@ export function parsePendingSnapshot(raw: string | null): PendingSnapshot | null
             role: m.role,
             content: m.content,
             ...(m.summary ? { summary: m.summary } : {}),
+            // 끊김 표시는 답변에만 의미가 있다 — 질문에 붙은 값은 버린다
+            ...(m.interrupted === true && m.role === "assistant" ? { interrupted: true } : {}),
         })),
         mealPlanMode,
     };

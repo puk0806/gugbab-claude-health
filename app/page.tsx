@@ -80,9 +80,16 @@ async function recoverPendingSnapshot(): Promise<Conversation | undefined> {
     }
 }
 
-/** 받는 중이던 답변 — 받은 본문이 있으면 assistant 턴으로 붙이고, 없으면 질문까지만 */
+// 마크다운 기호·공백만 받은 조각("**", "- " 등)은 읽을 내용이 없다 — 답변으로 치지 않는다
+const MARKDOWN_ONLY = /^[\s*_#>\-`~|=+.:]*$/;
+
+/**
+ * 받는 중이던 답변 — 읽을 본문이 있으면 끊김 표시를 단 assistant 턴으로 붙이고,
+ * 없으면 질문까지만 둔다(복원 때 끊김 안내 + 입력창 재채움 경로를 탄다)
+ */
 function withPartialAnswer(pending: ChatMessage[], partial: string): ChatMessage[] {
-    return partial ? [...pending, { role: "assistant", content: partial }] : pending;
+    if (MARKDOWN_ONLY.test(partial)) return pending;
+    return [...pending, { role: "assistant", content: partial, interrupted: true }];
 }
 // 이 개수 미만이면 "보유 재료로만 vs 자유 추천" 선택을 강제한다 (대화방당 1회)
 const SCARCE_INGREDIENT_THRESHOLD = 3;
@@ -472,10 +479,26 @@ export default function ChatPage() {
     const needsModeChoice = ingredientsScarce && mealPlanMode === null && !modeSkipped && !roomHasHistory;
 
     function handleSend() {
-        if (!input.trim() || streaming || !context || needsModeChoice) return;
+        if (!input.trim()) return;
+        if (sendQuestion(input.trim(), messages)) setInput("");
+    }
 
-        const userMsg: ChatMessage = { role: "user", content: input.trim() };
-        const nextMessages = [...messages, userMsg];
+    // 끊긴 답변 다시 묻기 — 끊긴 질문·답변 쌍을 걷어내고 같은 질문을 그 자리에서 다시 보낸다.
+    // 잘린 답변을 이력에 남기면 모델이 그 조각을 이어 쓰거나 같은 질문이 두 번 쌓인다
+    function handleRetryInterrupted() {
+        const last = messages.at(-1);
+        const question = messages.at(-2);
+        if (!last?.interrupted || question?.role !== "user") return;
+        sendQuestion(question.content, messages.slice(0, -2));
+    }
+
+    /** 질문을 base 뒤에 붙여 보낸다. 보낼 수 없는 상태면 false */
+    function sendQuestion(question: string, base: ChatMessage[]): boolean {
+        // pendingRef는 같은 렌더 안의 연타(상태 반영 전)까지 막는다
+        if (streaming || pendingRef.current || !context || needsModeChoice) return false;
+
+        const userMsg: ChatMessage = { role: "user", content: question };
+        const nextMessages = [...base, userMsg];
         pendingRef.current = nextMessages;
         summaryRef.current = undefined;
         // 이전 답변 본문이 남아 있으면 이탈 저장이 그걸 이번 답으로 오인한다
@@ -486,7 +509,6 @@ export default function ChatPage() {
         nearBottomRef.current = true;
         setShowJumpBtn(false);
         setMessages(nextMessages);
-        setInput("");
         // 현재 방 요약은 메시지 이력으로 이미 전달되므로 다른 방 요약만 담는다
         const recentMealSummaries = roomSummaries
             .filter((r) => r.id !== conversationId)
@@ -499,6 +521,7 @@ export default function ChatPage() {
         // 긴 답변이 쌓여도 API 한도를 넘지 않도록 오래된 턴은 요약·절삭해 전송
         // 목록으로 검증된 경우에만 model 전달 — 미로드 시 relay 기본값에 위임 (폐기된 alias 전송 방지)
         send({ messages: toOutgoingMessages(nextMessages), context: contextWithMode, ...(models ? { model } : {}) });
+        return true;
     }
 
     function handleNewChat() {
@@ -640,6 +663,24 @@ export default function ChatPage() {
                                     {...bindLongPress(({ x, y }) => setCopyMenu({ content: body, x, y }))}
                                 >
                                     {body}
+                                </div>
+                            )}
+                            {msg.interrupted && (
+                                <div className={styles.interruptedNote}>
+                                    {/* relay는 본문 뒤 요약까지 만든 뒤에 완료를 알려, 본문이 다 보인 직후 떠나도
+                                        여기로 온다 — "잘렸다"고 단정하지 않는 문구를 쓴다 */}
+                                    <span>답변을 끝까지 받기 전에 화면을 벗어났어요</span>
+                                    {/* 마지막 답변일 때만 다시 묻기 — 이후 대화가 이어졌으면 되돌리지 않는다 */}
+                                    {i === messages.length - 1 && (
+                                        <button
+                                            type="button"
+                                            className={styles.retryBtn}
+                                            onClick={handleRetryInterrupted}
+                                            disabled={streaming || needsModeChoice}
+                                        >
+                                            다시 묻기
+                                        </button>
+                                    )}
                                 </div>
                             )}
                             {drafts.map((draft, j) => (

@@ -1,7 +1,9 @@
 .sheetBackdrop {
   position: fixed;
   inset: 0;
-  /* BottomNav(z-index: 100)보다 위 — 선택 전에는 다른 조작 차단 */
+  /* 하단 탭(BottomNav 높이)은 덮지 않는다 — 고르기 전에도 다른 탭으로 갈 수 있게.
+     대화 화면(입력창 포함)만 선택 전 조작을 막는다 */
+  bottom: calc(64px + env(safe-area-inset-bottom));
   z-index: 200;
   background: var(--gugbab-color-overlay);
   display: flex;
@@ -12,7 +14,8 @@
   width: 100%;
   background: var(--gugbab-color-bg-surface);
   border-radius: 16px 16px 0 0;
-  padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+  /* 기기 하단 여백은 하단 탭이 이미 차지한다 */
+  padding: 16px;
   animation: sheetUp 0.2s ease-out;
 }
 
